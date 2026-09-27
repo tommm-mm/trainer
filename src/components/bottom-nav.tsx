@@ -1,18 +1,18 @@
 import Link from "next/link";
 
-// Tabs for the v1 screens. Only Week is live in Phase 1; the rest
-// are rendered disabled until their phase ships.
+// Tabs for the v1 screens. Disabled tabs are rendered greyed out until
+// their phase ships.
 const TABS = [
   { href: "/", label: "Week", enabled: true },
-  { href: "/log", label: "Log", enabled: false },
+  { href: "/log", label: "Log", enabled: true },
   { href: "/checkin", label: "Check-in", enabled: false },
-  { href: "/goal", label: "Goal", enabled: false },
+  { href: "/goal", label: "Goal", enabled: true },
   { href: "/analytics", label: "Stats", enabled: false },
 ];
 
 export function BottomNav({ active }: { active: string }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 border-t border-neutral-800 bg-neutral-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+    <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-neutral-800 bg-neutral-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       <ul className="mx-auto flex max-w-md">
         {TABS.map((tab) => (
           <li key={tab.href} className="flex-1">
@@ -36,5 +36,22 @@ export function BottomNav({ active }: { active: string }) {
         ))}
       </ul>
     </nav>
+  );
+}
+
+export function PageShell({
+  active,
+  children,
+}: {
+  active: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <main className="mx-auto w-full max-w-md flex-1 px-4 pb-28 pt-6">
+        {children}
+      </main>
+      <BottomNav active={active} />
+    </>
   );
 }
