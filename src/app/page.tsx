@@ -19,6 +19,8 @@ import { signOut } from "./actions";
 import { approveWeek, resolveFlag } from "./week/actions";
 import { PlanRow } from "./week/plan-row";
 import { AddSession } from "./week/add-session";
+import { SyncButton } from "./week/sync-button";
+import { FeedbackCard } from "./week/feedback-card";
 
 export default async function WeekPage({ searchParams }: PageProps<"/">) {
   const { week } = await searchParams;
@@ -28,7 +30,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
   const isCurrentWeek = monday === mondayOf(today);
 
   const supabase = await createClient();
-  const [plansRes, activitiesRes, gymRes, flagsRes, goal] = await Promise.all([
+  const [plansRes, activitiesRes, gymRes, flagsRes, goal, feedbackRes] = await Promise.all([
     supabase
       .from("weekly_plans")
       .select("*")
@@ -53,12 +55,23 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .eq("resolved", false)
       .order("date", { ascending: false }),
     getActiveGoal(supabase),
+    // Synced workouts from the last week still waiting for feedback.
+    supabase
+      .from("activities")
+      .select("*")
+      .eq("source", "garmin")
+      .is("feedback_at", null)
+      .gte("date", addDays(today, -7))
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false }),
   ]);
 
   const plans = plansRes.data ?? [];
   const activities = activitiesRes.data ?? [];
   const gym = gymRes.data ?? [];
   const flags = flagsRes.data ?? [];
+  const pendingFeedback = feedbackRes.data ?? [];
+  const nextFeedback = pendingFeedback[0];
   const loadError = plansRes.error ?? activitiesRes.error ?? gymRes.error ?? flagsRes.error;
   const proposedCount = plans.filter((p) => p.status === "proposed").length;
 
@@ -82,6 +95,10 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
           </button>
         </form>
       </header>
+
+      <div className="mb-3">
+        <SyncButton />
+      </div>
 
       <nav className="mb-4 flex items-center gap-2">
         <Link href={`/?week=${addDays(monday, -7)}`} className={btnSmall}>
@@ -122,6 +139,33 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
               </form>
             </div>
           ))}
+        </section>
+      )}
+
+      {nextFeedback && (
+        <section className="mb-4">
+          <FeedbackCard
+            key={nextFeedback.id}
+            activity={{
+              id: nextFeedback.id,
+              title: nextFeedback.name ?? (nextFeedback.type === "run" ? "Run" : "Strength"),
+              subtitle: [
+                formatDay(nextFeedback.date),
+                nextFeedback.distance_km ? `${formatNumber(nextFeedback.distance_km)} km` : null,
+                nextFeedback.avg_pace ? `${nextFeedback.avg_pace}/km` : null,
+                nextFeedback.duration_min ? `${formatNumber(nextFeedback.duration_min, 0)} min` : null,
+                nextFeedback.avg_hr ? `${nextFeedback.avg_hr} bpm` : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            }}
+          />
+          {pendingFeedback.length > 1 && (
+            <p className="mt-1 text-xs text-neutral-500">
+              +{pendingFeedback.length - 1} more workout
+              {pendingFeedback.length > 2 ? "s" : ""} waiting for feedback
+            </p>
+          )}
         </section>
       )}
 
@@ -240,15 +284,17 @@ function DayCard({
             <p className="mb-1 text-[11px] uppercase tracking-wide text-neutral-500">Logged</p>
             {runs.map((r) => (
               <p key={r.id}>
-                🏃 {formatNumber(r.distance_km)} km
+                🏃 {r.name ? `${r.name} · ` : ""}
+                {formatNumber(r.distance_km)} km
                 {r.avg_pace && ` · ${r.avg_pace}/km`}
                 {r.avg_hr && ` · ${r.avg_hr} bpm`}
                 {r.source === "garmin" && <span className="text-neutral-500"> · Garmin</span>}
+                {r.feeling_score && <span className="text-sky-300"> · feel {r.feeling_score}/10</span>}
               </p>
             ))}
             {garminGym.map((g) => (
               <p key={g.id}>
-                🏋️ Strength {formatNumber(g.duration_min, 0)} min
+                🏋️ {g.name ?? "Strength"} {formatNumber(g.duration_min, 0)} min
                 {g.avg_hr && ` · ${g.avg_hr} bpm`}
                 <span className="text-neutral-500"> · Garmin</span>
               </p>
