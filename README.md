@@ -5,16 +5,27 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 
 ## Build status
 
-| Phase | Scope | Status |
+| Step | Scope | Status |
 |---|---|---|
 | 1 | Scaffold, Supabase auth, login | ✅ |
 | 2 | Week View, Log Workout, Goal Overview, seed goal | ✅ |
-| 3 | Check-in, Analytics | ⏳ |
-| 4 | Stub `/api/generate-week` | ⏳ |
-| 5 | intervals.icu sync | ⏳ |
-| 6 | Real Claude call + flags | ⏳ |
-| 7 | Vercel Cron (2x/week) | ⏳ |
-| 8 | PWA manifest/icons | ⏳ |
+| A | London region, Garmin sync via intervals.icu, auto-tick plans, post-workout feedback | ✅ |
+| B | Check-in + Analytics (volume, long-run share, ACWR, monotony, HR trend) | ⏳ |
+| C | Stub `/api/generate-week` + "Generate my week" | ⏳ |
+| D | Real Claude call + goal-type branching + flags | ⏳ |
+| E | Scheduled AI draft (Vercel Cron, 2x/week) | ⏳ |
+| F | PWA install on phone | ⏳ |
+
+## Garmin sync
+
+Garmin Connect → intervals.icu (their side) → `POST /api/sync` → `activities`.
+
+- Runs automatically when the Week View opens (at most every 10 min) and on the "↻ Garmin" button.
+- Window: last 30 days on first sync, then from the latest synced day − 3 days. Idempotent (unique `user_id, external_id`).
+- Runs / trail / virtual / treadmill → `run`; weight training → `gym`; other sports are skipped.
+- Same-day `approved`/`edited` plan of the same kind → `completed`. `proposed` plans are never touched.
+- Same-day manual gym logs → `garmin_confirmed = true`.
+- Each synced workout shows a feedback card (feeling, RPE, notes). "Pain" creates a `pain_reported` flag.
 
 ## Structure
 
@@ -57,9 +68,10 @@ npm run dev
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Vercel (set) | 1 |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Vercel (set) | 1 |
-| `SUPABASE_SERVICE_ROLE_KEY` | Vercel, server only | 5 |
-| `INTERVALS_ICU_API_KEY` | Vercel, server only | 5 |
-| `ANTHROPIC_API_KEY` | Vercel, server only | 6 |
+| `SUPABASE_SERVICE_ROLE_KEY` | Vercel, server only | E |
+| `INTERVALS_ICU_API_KEY` | Vercel, server only | A |
+| `INTERVALS_ICU_ATHLETE_ID` | optional, defaults to `i726906` | A |
+| `ANTHROPIC_API_KEY` | Vercel, server only | D |
 
 ## Account (single user)
 

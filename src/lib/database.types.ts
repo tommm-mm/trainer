@@ -24,8 +24,12 @@ export type Database = {
           duration_min: number | null
           elevation_m: number | null
           external_id: string | null
+          feedback_at: string | null
+          feedback_notes: string | null
+          feeling_score: number | null
           id: string
           max_hr: number | null
+          name: string | null
           rpe: number | null
           source: string
           type: string
@@ -40,8 +44,12 @@ export type Database = {
           duration_min?: number | null
           elevation_m?: number | null
           external_id?: string | null
+          feedback_at?: string | null
+          feedback_notes?: string | null
+          feeling_score?: number | null
           id?: string
           max_hr?: number | null
+          name?: string | null
           rpe?: number | null
           source: string
           type: string
