@@ -30,7 +30,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
   const isCurrentWeek = monday === mondayOf(today);
 
   const supabase = await createClient();
-  const [plansRes, activitiesRes, gymRes, flagsRes, goal, feedbackRes] = await Promise.all([
+  const [plansRes, activitiesRes, gymRes, flagsRes, goal, feedbackRes, lastCheckinRes] = await Promise.all([
     supabase
       .from("weekly_plans")
       .select("*")
@@ -64,6 +64,12 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .gte("date", addDays(today, -7))
       .order("date", { ascending: false })
       .order("created_at", { ascending: false }),
+    supabase
+      .from("checkins")
+      .select("date")
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const plans = plansRes.data ?? [];
@@ -74,6 +80,11 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
   const nextFeedback = pendingFeedback[0];
   const loadError = plansRes.error ?? activitiesRes.error ?? gymRes.error ?? flagsRes.error;
   const proposedCount = plans.filter((p) => p.status === "proposed").length;
+  // Gentle nudge when there's no check-in in the last 4 days (today included).
+  const lastCheckin = lastCheckinRes.data?.date ?? null;
+  const daysSinceCheckin = lastCheckin ? daysBetween(lastCheckin, today) : null;
+  const showCheckinReminder =
+    isCurrentWeek && !lastCheckinRes.error && (daysSinceCheckin === null || daysSinceCheckin >= 4);
 
   const plannedKm = plans.reduce((s, p) => s + (p.target_distance_km ?? 0), 0);
   const doneKm = activities
@@ -167,6 +178,23 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
             </p>
           )}
         </section>
+      )}
+
+      {showCheckinReminder && (
+        <Link
+          href="/checkin"
+          className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3"
+        >
+          <div className="text-sm">
+            <p className="font-medium text-emerald-300">How are you feeling?</p>
+            <p className="text-xs text-neutral-400">
+              {daysSinceCheckin === null
+                ? "No check-ins yet. Sleep, soreness and stress help read your training load."
+                : `Last check-in ${daysSinceCheckin} days ago. 30 seconds keeps the picture complete.`}
+            </p>
+          </div>
+          <span className="shrink-0 text-xs text-emerald-400">Check in →</span>
+        </Link>
       )}
 
       <section className="mb-4 grid grid-cols-2 gap-2">

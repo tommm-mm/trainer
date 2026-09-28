@@ -5,9 +5,9 @@ import Link from "next/link";
 const TABS = [
   { href: "/", label: "Week", enabled: true },
   { href: "/log", label: "Log", enabled: true },
-  { href: "/checkin", label: "Check-in", enabled: false },
+  { href: "/checkin", label: "Check-in", enabled: true },
   { href: "/goal", label: "Goal", enabled: true },
-  { href: "/analytics", label: "Stats", enabled: false },
+  { href: "/analytics", label: "Stats", enabled: true },
 ];
 
 export function BottomNav({ active }: { active: string }) {

@@ -54,23 +54,72 @@ export function mapActivity(raw: IntervalsActivity): SyncedActivity | null {
   };
 }
 
-export async function fetchActivities(oldest: string, newest: string) {
+function authHeaders() {
   const key = process.env.INTERVALS_ICU_API_KEY;
   if (!key) throw new Error("INTERVALS_ICU_API_KEY is not set.");
-  const athlete = process.env.INTERVALS_ICU_ATHLETE_ID || DEFAULT_ATHLETE_ID;
+  return {
+    Authorization: `Basic ${Buffer.from(`API_KEY:${key}`).toString("base64")}`,
+    Accept: "application/json",
+  };
+}
 
-  const url = `${BASE_URL}/athlete/${athlete}/activities?oldest=${oldest}&newest=${newest}`;
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Basic ${Buffer.from(`API_KEY:${key}`).toString("base64")}`,
-      Accept: "application/json",
-    },
-    cache: "no-store",
-  });
+function athletePath() {
+  return `${BASE_URL}/athlete/${process.env.INTERVALS_ICU_ATHLETE_ID || DEFAULT_ATHLETE_ID}`;
+}
+
+export async function fetchActivities(oldest: string, newest: string) {
+  const url = `${athletePath()}/activities?oldest=${oldest}&newest=${newest}`;
+  const res = await fetch(url, { headers: authHeaders(), cache: "no-store" });
   if (!res.ok) {
     throw new Error(`intervals.icu responded ${res.status}: ${(await res.text()).slice(0, 200)}`);
   }
   return (await res.json()) as IntervalsActivity[];
+}
+
+type IntervalsAthlete = {
+  icu_resting_hr?: number | null;
+  sportSettings?: { types?: string[]; max_hr?: number | null }[];
+};
+type IntervalsWellness = { id?: string; restingHR?: number | null };
+
+/**
+ * Resting HR (median of Garmin's daily values over the last 30 days, else the
+ * profile value) and running max HR from intervals.icu. Best effort: any
+ * failure returns nulls and the metrics fall back to defaults.
+ * Cached for 6 h — these numbers move slowly.
+ */
+export async function fetchHrSettings(
+  oldest: string,
+  newest: string,
+): Promise<{ restHr: number | null; maxHr: number | null }> {
+  try {
+    // Auth-header requests are only cached with an explicit force-cache (Next 16).
+    const init: RequestInit = {
+      headers: authHeaders(),
+      cache: "force-cache",
+      next: { revalidate: 21600 },
+    };
+    const [athleteRes, wellnessRes] = await Promise.all([
+      fetch(athletePath(), init),
+      fetch(`${athletePath()}/wellness?oldest=${oldest}&newest=${newest}`, init),
+    ]);
+    const athlete = athleteRes.ok ? ((await athleteRes.json()) as IntervalsAthlete) : {};
+    const wellness = wellnessRes.ok ? ((await wellnessRes.json()) as IntervalsWellness[]) : [];
+
+    const daily = wellness
+      .map((w) => w.restingHR)
+      .filter((v): v is number => typeof v === "number" && v > 25 && v < 120)
+      .sort((a, b) => a - b);
+    const restHr = daily.length
+      ? daily[Math.floor(daily.length / 2)]
+      : (athlete.icu_resting_hr ?? null);
+
+    const run = athlete.sportSettings?.find((s) => s.types?.some((t) => RUN_TYPES.test(t)));
+    return { restHr, maxHr: run?.max_hr ?? null };
+  } catch (err) {
+    console.error("[intervals] HR settings unavailable:", err);
+    return { restHr: null, maxHr: null };
+  }
 }
 
 function round(n: number, digits: number) {

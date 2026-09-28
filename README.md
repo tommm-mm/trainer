@@ -10,7 +10,7 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | 1 | Scaffold, Supabase auth, login | ✅ |
 | 2 | Week View, Log Workout, Goal Overview, seed goal | ✅ |
 | A | London region, Garmin sync via intervals.icu, auto-tick plans, post-workout feedback | ✅ |
-| B | Check-in + Analytics (volume, long-run share, ACWR, monotony, HR trend) | ⏳ |
+| B | Check-in + Analytics (volume, long-run share, ACWR, monotony, HR trend) | ✅ |
 | C | Stub `/api/generate-week` + "Generate my week" | ⏳ |
 | D | Real Claude call + goal-type branching + flags | ⏳ |
 | E | Scheduled AI draft (Vercel Cron, 2x/week) | ⏳ |
@@ -27,6 +27,22 @@ Garmin Connect → intervals.icu (their side) → `POST /api/sync` → `activiti
 - Same-day manual gym logs → `garmin_confirmed = true`.
 - Each synced workout shows a feedback card (feeling, RPE, notes). "Pain" creates a `pain_reported` flag.
 
+## Metrics (`src/lib/metrics.ts`)
+
+Pure functions, unit-tested (`npm test`), shared by the Stats page and the AI coach.
+
+| Metric | Formula |
+|---|---|
+| Session load (sRPE) | `duration_min × RPE` (AU). Missing RPE → runs: `15 × HRR − 6` from avg HR; gym/other: your median RPE for the type; else 5 |
+| HR reserve (HRR) | `(avg HR − rest) / (max − rest)`. Rest = Garmin 30-day median (fallback 46); max = max(195, intervals.icu setting, highest HR seen) |
+| ACWR | `7-day load / (28-day load / 4)`, daily; null until 28 days of history. Safe band 0.8–1.3 |
+| Monotony / strain | `mean daily load / SD` per ISO week (rest days = 0); strain = `weekly load × monotony` |
+| Long-run share | `longest run / weekly run km`; guideline 30–35% |
+| Easy runs | RPE ≤ 4, or unrated with HRR ≤ 75% |
+| Efficiency Factor | `speed (m/min) / avg HR` on easy runs, also shown as pace at 65% HRR |
+
+History: the Stats page offers a one-time 120-day Garmin import while there are < 12 weeks of activities.
+
 ## Structure
 
 ```
@@ -40,6 +56,9 @@ src/
   lib/domain.ts             # goal types/statuses/phases, params shapes, Padova seed
   lib/sessions.ts           # suggested session types + run/gym classifier
   lib/form.ts               # FormData parsing for Server Actions
+  lib/metrics.ts            # training-load metrics (pure, tested)
+  app/checkin/              # daily check-in + body metrics, editable history
+  app/analytics/            # Stats: charts (Recharts) over metrics.ts
   app/login/                # email/password sign-in (no signup)
   app/page.tsx              # Week View (plans, logs, flags, approve/edit/complete)
   app/week/                 # Week View actions + client components
