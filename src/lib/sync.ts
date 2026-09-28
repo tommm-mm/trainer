@@ -21,7 +21,18 @@ export type SyncResult = {
   completedPlans: number;
 };
 
-export async function syncGarmin(supabase: DB, userId: string): Promise<SyncResult> {
+/** How far back the one-time history import reaches (12 weeks + ACWR warm-up). */
+export const BACKFILL_DAYS = 120;
+
+/**
+ * `backfillDays` re-reads a longer window (one-time history import); the
+ * upsert keeps it idempotent, so re-running it only refreshes rows.
+ */
+export async function syncGarmin(
+  supabase: DB,
+  userId: string,
+  opts: { backfillDays?: number } = {},
+): Promise<SyncResult> {
   const to = todayISO();
 
   const { data: last, error: lastErr } = await supabase
@@ -32,7 +43,11 @@ export async function syncGarmin(supabase: DB, userId: string): Promise<SyncResu
     .limit(1)
     .maybeSingle();
   if (lastErr) throw lastErr;
-  const from = last ? addDays(last.date, -OVERLAP_DAYS) : addDays(to, -FIRST_SYNC_DAYS);
+  const from = opts.backfillDays
+    ? addDays(to, -opts.backfillDays)
+    : last
+      ? addDays(last.date, -OVERLAP_DAYS)
+      : addDays(to, -FIRST_SYNC_DAYS);
 
   const raw = await fetchActivities(from, to);
   const rows = raw.map(mapActivity).filter((r) => r !== null);

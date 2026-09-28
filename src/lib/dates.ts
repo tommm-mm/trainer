@@ -58,6 +58,15 @@ export function formatDay(iso: string): string {
   });
 }
 
+/** "29 Sep" */
+export function formatShortDate(iso: string): string {
+  return new Date(toUTC(iso)).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
 /** "18 Apr 2027" */
 export function formatLongDate(iso: string): string {
   return new Date(toUTC(iso)).toLocaleDateString("en-GB", {
