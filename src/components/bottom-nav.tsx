@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LiveRefresh } from "./live-refresh";
 
 // Tabs for the v1 screens. Disabled tabs are rendered greyed out until
 // their phase ships.
@@ -52,6 +53,7 @@ export function PageShell({
         {children}
       </main>
       <BottomNav active={active} />
+      <LiveRefresh />
     </>
   );
 }

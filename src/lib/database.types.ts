@@ -238,34 +238,6 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["goals"]["Insert"]>
         Relationships: []
       }
-      gym_sessions: {
-        Row: {
-          created_at: string
-          date: string
-          exercise: string
-          garmin_confirmed: boolean
-          id: string
-          reps: number | null
-          rpe: number | null
-          sets: number | null
-          user_id: string
-          weight_kg: number | null
-        }
-        Insert: {
-          created_at?: string
-          date: string
-          exercise: string
-          garmin_confirmed?: boolean
-          id?: string
-          reps?: number | null
-          rpe?: number | null
-          sets?: number | null
-          user_id?: string
-          weight_kg?: number | null
-        }
-        Update: Partial<Database["public"]["Tables"]["gym_sessions"]["Insert"]>
-        Relationships: []
-      }
       template_exercises: {
         Row: {
           block: string

@@ -53,6 +53,7 @@ export function StatChart({
   domain,
   ticks,
   reversed = false,
+  allLabels = false,
 }: {
   data: Row[];
   bars?: Series[];
@@ -67,6 +68,8 @@ export function StatChart({
   ticks?: number[];
   /** For pace: faster (smaller) values plotted higher. */
   reversed?: boolean;
+  /** Categorical x axis: show every label (smaller type) instead of skipping. */
+  allLabels?: boolean;
 }) {
   const legend = [
     ...bars.map((s) => ({ name: s.name, color: s.color, dashed: false })),
@@ -96,7 +99,13 @@ export function StatChart({
       <ResponsiveContainer width="100%" height={HEIGHT}>
         <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -4 }} barCategoryGap="20%">
           <CartesianGrid vertical={false} stroke={COLORS.grid} />
-          <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={14} />
+          <XAxis
+            dataKey="label"
+            {...axisProps}
+            {...(allLabels
+              ? { interval: 0, tick: { fill: COLORS.axis, fontSize: 9 } }
+              : { interval: "preserveStartEnd" as const, minTickGap: 14 })}
+          />
           <YAxis
             {...axisProps}
             width={46}

@@ -3,6 +3,8 @@ import { cardCls } from "@/components/ui";
 import { formatNumber } from "@/lib/format";
 import { STATUS_LABEL, type Status, type Verdict } from "@/lib/assess";
 import { StatChart } from "./charts";
+import { NumbersTable } from "./numbers-table";
+import { VariantChart } from "./variant-chart";
 import type { Block, StatsModel } from "./model";
 import { STATUS_COLOR } from "./theme";
 
@@ -27,26 +29,56 @@ export function StatsView({ model }: { model: StatsModel }) {
     <div className="flex flex-col gap-4">
       <CoachRead model={model} />
 
-      <section className="grid grid-cols-2 gap-2">
-        {model.tiles.map((t) => (
-          <div key={t.label} className="rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-wide text-neutral-500">{t.label}</p>
-            <p className="text-lg font-semibold">{t.value}</p>
-            {t.verdict && t.verdict.status !== "na" && (
-              <p className="text-[11px]" style={{ color: STATUS_COLOR[t.verdict.status] }}>
-                {ICON[t.verdict.status]} {STATUS_LABEL[t.verdict.status]}
-              </p>
-            )}
-          </div>
-        ))}
-      </section>
+      <Tiles tiles={model.tiles} />
 
       {model.blocks.map((b) => (
         <ChartCard key={b.id} block={b} />
       ))}
 
+      {model.gym && (
+        <>
+          <h2 id="gym" className="mt-4 scroll-mt-4 text-lg font-semibold tracking-tight">
+            Gym
+          </h2>
+          {model.gym.hasData ? (
+            <>
+              <Tiles tiles={model.gym.tiles} />
+              {model.gym.blocks.map((b) => (
+                <ChartCard key={b.id} block={b} />
+              ))}
+            </>
+          ) : (
+            <p className={`${cardCls} text-sm text-neutral-400`}>
+              No workouts logged yet. Log one in the{" "}
+              <Link href="/gym" className="text-emerald-400">
+                Gym
+              </Link>{" "}
+              tab and this section fills in: strength per lift, sets per muscle, records.
+            </p>
+          )}
+        </>
+      )}
+
       <HowComputed model={model} />
     </div>
+  );
+}
+
+function Tiles({ tiles }: { tiles: StatsModel["tiles"] }) {
+  return (
+    <section className="grid grid-cols-2 gap-2">
+      {tiles.map((t) => (
+        <div key={t.label} className="rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2">
+          <p className="text-[11px] uppercase tracking-wide text-neutral-500">{t.label}</p>
+          <p className="text-lg font-semibold">{t.value}</p>
+          {t.verdict && t.verdict.status !== "na" && (
+            <p className="text-[11px]" style={{ color: STATUS_COLOR[t.verdict.status] }}>
+              {ICON[t.verdict.status]} {STATUS_LABEL[t.verdict.status]}
+            </p>
+          )}
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -61,7 +93,7 @@ function CoachRead({ model }: { model: StatsModel }) {
       <ul className="flex flex-col gap-2.5">
         {model.coach.map((i) => (
           <li key={i.id}>
-            <a href={`#${i.id}`} className="block">
+            <a href={`#${i.anchor ?? i.id}`} className="block">
               <div className="mb-0.5 flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-neutral-100">{i.title}</span>
                 <Badge status={i.verdict.status} value={i.verdict.value} />
@@ -77,7 +109,7 @@ function CoachRead({ model }: { model: StatsModel }) {
           {model.onPoint.map((o, i) => (
             <span key={o.id}>
               {i > 0 && " · "}
-              <a href={`#${o.id}`} className="underline decoration-neutral-600 underline-offset-2">
+              <a href={`#${o.anchor ?? o.id}`} className="underline decoration-neutral-600 underline-offset-2">
                 {o.title}
               </a>
               {o.value && <span className="text-neutral-500"> {o.value}</span>}
@@ -106,41 +138,25 @@ function ChartCard({ block }: { block: Block }) {
           {v.message}
         </p>
       )}
-      <StatChart {...block.chart} />
+      {block.chart && <StatChart {...block.chart} />}
+      {block.variants &&
+        (block.variants.length > 0 ? (
+          <VariantChart variants={block.variants} />
+        ) : (
+          <p className="py-4 text-center text-xs text-neutral-500">
+            No main lift logged yet. Log a main lift to start its trend.
+          </p>
+        ))}
+      {block.table && block.tableOpen && block.table.rows.length === 0 ? (
+        <p className="py-3 text-center text-xs text-neutral-500">No records yet: the first session sets the baseline.</p>
+      ) : (
+        block.table && block.tableOpen && <NumbersTable table={block.table} open />
+      )}
       <p className="mt-2 text-xs leading-relaxed text-neutral-400">
         <span className="text-neutral-300">How to read: </span>
         {block.how}
       </p>
-      {block.table && (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs text-neutral-500">Show numbers</summary>
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-xs tabular-nums">
-              <thead className="text-neutral-500">
-                <tr>
-                  {block.table.headers.map((h) => (
-                    <th key={h} className="px-1 py-1 text-right font-normal first:text-left">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="text-neutral-300">
-                {block.table.rows.map((r, i) => (
-                  <tr key={i} className="border-t border-neutral-800">
-                    {r.map((c, j) => (
-                      <td key={j} className="px-1 py-1 text-right first:text-left">
-                        {c}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="mt-1 text-[11px] text-neutral-600">* week in progress</p>
-          </div>
-        </details>
-      )}
+      {block.table && !block.tableOpen && <NumbersTable table={block.table} />}
     </section>
   );
 }
@@ -165,7 +181,8 @@ function HowComputed({ model }: { model: StatsModel }) {
         <span className="text-neutral-300">Missing effort ratings</span>
         {estimatedShare !== null && ` (${formatNumber(estimatedShare * 100, 0)}% of recent load)`}: runs
         use your heart rate (RPE ≈ 15 × %HR-reserve − 6); gym uses your median gym RPE, because
-        strength work barely lifts HR; anything else uses 5. Rate sessions on the{" "}
+        strength work barely lifts HR; anything else uses 5. Gym workouts logged without the watch count
+        with the logger&apos;s duration × your session RPE; linked ones count once, through Garmin. Rate sessions on the{" "}
         <Link href="/" className="text-emerald-400">
           Week
         </Link>{" "}

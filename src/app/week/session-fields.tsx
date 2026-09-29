@@ -1,15 +1,24 @@
 import { SESSION_TYPES } from "@/lib/sessions";
 import { inputCls, labelCls } from "@/components/ui";
 
+export type TemplateOption = { id: string; name: string };
+
 type Defaults = {
   session_type?: string;
+  template_id?: string | null;
   target_distance_km?: number | null;
   target_sets?: number | null;
   notes?: string | null;
 };
 
 // Inputs shared by the "add session" and "edit session" forms.
-export function SessionFields({ defaults = {} }: { defaults?: Defaults }) {
+export function SessionFields({
+  defaults = {},
+  templates = [],
+}: {
+  defaults?: Defaults;
+  templates?: TemplateOption[];
+}) {
   return (
     <>
       <label className={labelCls}>
@@ -50,6 +59,19 @@ export function SessionFields({ defaults = {} }: { defaults?: Defaults }) {
           />
         </label>
       </div>
+      {templates.length > 0 && (
+        <label className={labelCls}>
+          Gym workout (optional)
+          <select name="template_id" defaultValue={defaults.template_id ?? ""} className={inputCls}>
+            <option value="">None</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className={labelCls}>
         Notes
         <textarea

@@ -12,6 +12,7 @@ import {
   type RunningWeek,
 } from "@/lib/metrics";
 import { formatPace } from "@/lib/format";
+import { HARD_SET_RANGE, VERDICT_MUSCLES, type Muscle } from "@/lib/strength";
 
 export type Status = "good" | "watch" | "off" | "na";
 
@@ -240,6 +241,8 @@ export type Insight = {
   id: string;
   title: string;
   verdict: Verdict;
+  /** Chart card to jump to, when it isn't `id`. */
+  anchor?: string;
 };
 
 /**
@@ -253,4 +256,113 @@ export function coachRead(items: Insight[], max = 5): Insight[] {
     .sort((a, b) => SEVERITY[b.item.verdict.status] - SEVERITY[a.item.verdict.status] || a.index - b.index)
     .slice(0, max)
     .map(({ item }) => item);
+}
+
+// ---------------------------------------------------------------- gym
+
+const MUSCLE_LABEL: Record<string, string> = {
+  chest: "chest",
+  back: "back",
+  shoulders: "shoulders",
+  biceps: "biceps",
+  triceps: "triceps",
+  quads: "quads",
+  hamstrings: "hamstrings",
+  glutes: "glutes",
+  calves: "calves",
+  core: "core",
+};
+
+const list = (items: string[], max = 3) => {
+  const names = items.map((m) => MUSCLE_LABEL[m] ?? m);
+  return names.length > max ? `${names.slice(0, max).join(", ")} and ${names.length - max} more` : names.join(", ");
+};
+
+/**
+ * Weekly hard sets per muscle vs 10–20 (Schoenfeld 2017; Pelland 2024).
+ * Only muscles in VERDICT_MUSCLES are judged. Below 10 is "watch", not "off":
+ * during a running-focused block, fewer sets can be the right call
+ * (≈⅓ of the volume maintains muscle, Bickel 2011).
+ */
+export function assessMuscleVolume(week: Record<Muscle, number> | null): Verdict {
+  if (!week || VERDICT_MUSCLES.every((m) => week[m] === 0)) {
+    return na("Needs a complete week with logged gym workouts.");
+  }
+  const below = VERDICT_MUSCLES.filter((m) => week[m] < HARD_SET_RANGE.low);
+  const above = VERDICT_MUSCLES.filter((m) => week[m] > HARD_SET_RANGE.high);
+  const inRange = VERDICT_MUSCLES.length - below.length - above.length;
+  const value = `${inRange}/${VERDICT_MUSCLES.length} in range`;
+  if (above.length > 0) {
+    return {
+      status: "watch",
+      value,
+      message: `Above 20 hard sets: ${list(above)}. Past ~20, gains flatten while fatigue (and your running) keeps paying. Move sets to lagging muscles.`,
+    };
+  }
+  if (below.length > 2) {
+    return {
+      status: "watch",
+      value,
+      message: `Under 10 hard sets: ${list(below)}. Fine to maintain; to grow them, add 2–3 sets a week, starting with the lowest.`,
+    };
+  }
+  return {
+    status: "good",
+    value,
+    message:
+      below.length > 0
+        ? `Most muscles in the 10–20 range; ${list(below)} a bit under.`
+        : "Every major muscle got 10–20 hard sets.",
+  };
+}
+
+/** e1RM trends of the main lifts, as % of current level per week. */
+export function assessStrengthTrend(lifts: { name: string; pct: number }[]): Verdict {
+  if (lifts.length === 0) return na("Needs a main lift trained in at least 3 different weeks.");
+  const up = lifts.filter((l) => l.pct >= 0.005);
+  const down = lifts.filter((l) => l.pct <= -0.01);
+  const value = `${up.length}/${lifts.length} rising`;
+  if (down.length * 2 >= lifts.length) {
+    return {
+      status: "off",
+      value,
+      message: `Estimated strength is dropping on ${list(down.map((l) => l.name))}. Usual causes: accumulated fatigue, too little sleep or food, or too much running load. A lighter week often brings it back.`,
+    };
+  }
+  if (up.length * 2 >= lifts.length) {
+    return { status: "good", value, message: `Getting stronger: ${list(up.map((l) => l.name))} trending up.` };
+  }
+  return {
+    status: "watch",
+    value,
+    message: "Strength is mostly flat. Normal while running volume builds; to progress, add a rep or a weight step when you hit the top of the rep range.",
+  };
+}
+
+/** Gym sessions per week (average of the last complete weeks) vs the plan. */
+export function assessGymFrequency(perWeek: number[], target: number): Verdict {
+  if (perWeek.length === 0 || target <= 0) return na("Needs a complete week of logging.");
+  const avg = perWeek.reduce((s, x) => s + x, 0) / perWeek.length;
+  const value = `${avg.toFixed(1)}/wk`;
+  if (avg >= target - 0.5) return { status: "good", value, message: `Consistent: about ${avg.toFixed(1)} sessions a week for ${target} planned.` };
+  return {
+    status: "watch",
+    value,
+    message: `About ${avg.toFixed(1)} sessions a week for ${target} planned. Missing sessions slows progress more than any programme detail.`,
+  };
+}
+
+/** Share of prescribed working sets actually done. */
+export function assessAdherence(share: number | null): Verdict {
+  if (share === null) return na("Needs a workout started from a template.");
+  const value = pct(share);
+  if (share >= 0.9) return { status: "good", value, message: "You're doing what the template prescribes." };
+  if (share >= 0.75) {
+    return { status: "watch", value, message: "Some prescribed sets are being skipped. If it's time, trim the template rather than rushing it." };
+  }
+  return {
+    status: "off",
+    value,
+    message: "Well under the prescription. The template may be too long for your week; keep the main lifts and cut the extras.",
+  };
 }

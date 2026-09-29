@@ -2,7 +2,7 @@ import { formatNumber, formatPace } from "@/lib/format";
 
 // Named formats so server components can tell client charts how to print
 // values (functions can't cross the server → client boundary).
-export type ValueFormat = "km" | "pct" | "ratio" | "load" | "pace" | "bpm" | "kg" | "ef";
+export type ValueFormat = "km" | "pct" | "ratio" | "load" | "pace" | "bpm" | "kg" | "ef" | "sets" | "tonnes" | "count";
 
 export function formatValue(v: number, format: ValueFormat, axis = false): string {
   switch (format) {
@@ -22,5 +22,11 @@ export function formatValue(v: number, format: ValueFormat, axis = false): strin
       return axis ? formatNumber(v, 1) : `${formatNumber(v, 1)} kg`;
     case "ef":
       return v.toFixed(2);
+    case "sets":
+      return axis ? formatNumber(v, 0) : `${formatNumber(v, 1)} sets`;
+    case "tonnes":
+      return axis ? formatNumber(v, 1) : `${formatNumber(v, 2)} t`;
+    case "count":
+      return formatNumber(v, 0);
   }
 }

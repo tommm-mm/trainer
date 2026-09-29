@@ -13,7 +13,9 @@ import {
   deletePlan,
   updatePlan,
 } from "./actions";
-import { SessionFields } from "./session-fields";
+import { SessionFields, type TemplateOption } from "./session-fields";
+
+export type PlanTemplate = TemplateOption & { exercises: string[] };
 
 const KIND_DOT: Record<string, string> = {
   run: "bg-emerald-400",
@@ -21,14 +23,21 @@ const KIND_DOT: Record<string, string> = {
   other: "bg-neutral-500",
 };
 
-export function PlanRow({ plan }: { plan: Tables<"weekly_plans"> }) {
+export function PlanRow({
+  plan,
+  templates,
+}: {
+  plan: Tables<"weekly_plans">;
+  templates: PlanTemplate[];
+}) {
   const [editing, setEditing] = useState(false);
   const kind = sessionKind(plan.session_type);
 
   if (editing) {
-    return <EditForm plan={plan} onDone={() => setEditing(false)} />;
+    return <EditForm plan={plan} templates={templates} onDone={() => setEditing(false)} />;
   }
 
+  const template = templates.find((t) => t.id === plan.template_id) ?? null;
   const target = [
     plan.target_distance_km ? `${formatNumber(plan.target_distance_km)} km` : null,
     plan.target_sets ? `${plan.target_sets} sets` : null,
@@ -47,6 +56,11 @@ export function PlanRow({ plan }: { plan: Tables<"weekly_plans"> }) {
               <span className="font-normal text-neutral-400">{target}</span>
             )}
           </p>
+          {template && (
+            <p className="mt-1 text-xs text-neutral-400">
+              <span className="text-neutral-300">{template.name}:</span> {template.exercises.join(" · ")}
+            </p>
+          )}
           {plan.notes && (
             <p className="mt-1 text-xs text-neutral-400">{plan.notes}</p>
           )}
@@ -63,7 +77,15 @@ export function PlanRow({ plan }: { plan: Tables<"weekly_plans"> }) {
         <button className={btnSmall} onClick={() => setEditing(true)}>
           Edit
         </button>
-        {plan.status !== "completed" && kind !== "other" && (
+        {plan.status !== "completed" && kind === "gym" && (
+          <Link
+            href={`/gym?plan=${plan.id}${plan.template_id ? `&template=${plan.template_id}` : ""}`}
+            className="rounded-md bg-emerald-500 px-2 py-1 text-xs font-medium text-neutral-950"
+          >
+            Start workout
+          </Link>
+        )}
+        {plan.status !== "completed" && kind === "run" && (
           <Link href={`/log?plan=${plan.id}`} className={btnSmall}>
             Log it
           </Link>
@@ -89,9 +111,11 @@ export function PlanRow({ plan }: { plan: Tables<"weekly_plans"> }) {
 
 function EditForm({
   plan,
+  templates,
   onDone,
 }: {
   plan: Tables<"weekly_plans">;
+  templates: TemplateOption[];
   onDone: () => void;
 }) {
   const [state, action, pending] = useActionState(
@@ -107,7 +131,7 @@ function EditForm({
     <form action={action} className="flex flex-col gap-2 rounded-lg bg-neutral-950/60 p-3">
       <input type="hidden" name="id" value={plan.id} />
       <input type="hidden" name="status" value={plan.status} />
-      <SessionFields defaults={plan} />
+      <SessionFields defaults={plan} templates={templates} />
       {state.error && <p className="text-xs text-red-400">{state.error}</p>}
       <div className="flex gap-2">
         <button disabled={pending} className={btnPrimary}>
