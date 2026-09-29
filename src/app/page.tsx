@@ -111,6 +111,15 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
         <SyncButton />
       </div>
 
+      {isCurrentWeek && (
+        <Link
+          href="/gym"
+          className="mb-4 flex h-12 items-center justify-center rounded-xl bg-emerald-500 text-base font-semibold text-neutral-950"
+        >
+          🏋️ Start gym workout
+        </Link>
+      )}
+
       <nav className="mb-4 flex items-center gap-2">
         <Link href={`/?week=${addDays(monday, -7)}`} className={btnSmall}>
           ‹ Prev

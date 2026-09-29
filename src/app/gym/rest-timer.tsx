@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { formatDuration } from "@/lib/gym/workout";
 
 const KEY = "trainer:gym:rest";
@@ -8,7 +8,8 @@ const KEY = "trainer:gym:rest";
 type RestState = { endsAt: number; total: number } | null;
 
 /**
- * Rest countdown based on an end timestamp (not a ticking counter), so it
+ * Silent rest countdown (no sound, no vibration: the bar just turns green),
+ * based on an end timestamp (not a ticking counter), so it
  * stays right when the screen locks or the tab sleeps. Persisted so a reload
  * mid-rest keeps it.
  */
@@ -56,7 +57,6 @@ export function useRestTimer() {
 
 export function RestBar({ rest }: { rest: ReturnType<typeof useRestTimer> }) {
   const [now, setNow] = useState(() => Date.now());
-  const buzzed = useRef<number | null>(null);
   const s = rest.state;
 
   useEffect(() => {
@@ -67,13 +67,6 @@ export function RestBar({ rest }: { rest: ReturnType<typeof useRestTimer> }) {
 
   const left = s ? Math.ceil((s.endsAt - now) / 1000) : 0;
   const over = s !== null && left <= 0;
-
-  useEffect(() => {
-    if (!s || !over || buzzed.current === s.endsAt) return;
-    buzzed.current = s.endsAt;
-    // Android vibrates; iOS ignores this and the bar just turns green.
-    navigator.vibrate?.([300, 150, 300, 150, 300]);
-  }, [s, over]);
 
   if (!s) return null;
   // Auto-hide 2 minutes after the rest ended.
