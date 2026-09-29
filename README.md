@@ -19,6 +19,7 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | D2 | Flexible week (sessions by priority, reshuffle when life happens) + weekly coach review with memory | ⏳ |
 | E | Automatic Sunday plan (Vercel Cron) | ⏳ |
 | F | PWA install + offline shell + "your week is ready" notification | ⏳ |
+| U | UX/UI review: missing tools and features, cleaner and more intuitive screens (after the coach works end to end) | ⏳ |
 | Later | "Ask coach" chat in the app; next season after Padova | ⏳ |
 
 ## Garmin sync
