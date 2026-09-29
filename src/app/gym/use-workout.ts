@@ -130,6 +130,14 @@ export function useWorkout(serverActive: Store | null, onDone: () => void) {
           await linkWorkouts(supabase, { from: addDays(s.doc.date, -1), to: addDays(s.doc.date, 1) });
           const { data } = await supabase.from("workouts").select("activity_id").eq("id", s.doc.id).maybeSingle();
           linked = !!data?.activity_id;
+          // The planned session this workout came from is now done.
+          if (s.doc.planId) {
+            await supabase
+              .from("weekly_plans")
+              .update({ status: "completed" })
+              .eq("id", s.doc.planId)
+              .in("status", ["approved", "edited"]);
+          }
         } catch {
           // Linking also runs after every Garmin sync; nothing is lost.
         }

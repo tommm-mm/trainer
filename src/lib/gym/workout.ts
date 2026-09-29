@@ -5,6 +5,7 @@
 // the network cooperates and is never duplicated or lost.
 
 import type { Tables } from "@/lib/database.types";
+import type { StrengthSession } from "@/lib/strength";
 
 export type Block = "main" | "finisher";
 export type Measure = "reps" | "time";
@@ -534,6 +535,32 @@ export function storeFromServer(w: ServerWorkout): Store {
     rev: 1,
     syncedRev: 1,
     deleted: { sets: [], exercises: [] },
+  };
+}
+
+// ---------------------------------------------------------------- strength metrics input
+
+/** The local workout in strength.ts's shape (for live meters). */
+export function toStrengthSession(doc: WorkoutDoc): StrengthSession {
+  return {
+    id: doc.id,
+    date: doc.date,
+    minutes: null,
+    session_rpe: doc.sessionRpe,
+    activity_id: null,
+    template_id: doc.templateId,
+    slots: doc.exercises.map((e) => ({
+      exercise_id: e.exerciseId,
+      block: e.block,
+      target: e.target ? { sets: e.target.sets, rir: e.target.rir } : null,
+      sets: e.sets.map((s) => ({
+        weight_kg: s.weightKg,
+        reps: s.reps,
+        duration_s: s.durationS,
+        rir: s.rir,
+        is_warmup: s.isWarmup,
+      })),
+    })),
   };
 }
 

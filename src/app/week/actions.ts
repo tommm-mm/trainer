@@ -61,6 +61,7 @@ function planFields(form: FormData) {
     }),
     target_sets: num(form, "target_sets", "Sets", { min: 0, max: 100, int: true }),
     notes: text(form, "notes"),
+    template_id: text(form, "template_id"),
   };
 }
 

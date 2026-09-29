@@ -1,7 +1,7 @@
 // Garmin (via intervals.icu) → Supabase sync. Pure plumbing:
 // - upserts activities (idempotent on user_id + external_id)
 // - ticks same-day approved/edited plan rows of the matching kind as completed
-// - confirms same-day manual gym logs with the Garmin strength activity
+// - links logged gym workouts to the same-day Garmin strength activity
 // It never approves, creates or edits plans: that stays a user action.
 
 import type { DB } from "@/lib/queries";
@@ -109,17 +109,6 @@ export async function syncGarmin(
       .in("id", [...toComplete]);
     if (error) throw error;
     result.completedPlans = toComplete.size;
-  }
-
-  // Passive confirmation of manual gym logs.
-  const gymDates = [...new Set(rows.filter((r) => r.type === "gym").map((r) => r.date))];
-  if (gymDates.length > 0) {
-    const { error } = await supabase
-      .from("gym_sessions")
-      .update({ garmin_confirmed: true })
-      .in("date", gymDates)
-      .eq("garmin_confirmed", false);
-    if (error) throw error;
   }
 
   // Logged gym workouts ↔ the Garmin session (duration, HR, session RPE).

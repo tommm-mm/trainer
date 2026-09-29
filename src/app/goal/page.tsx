@@ -218,15 +218,23 @@ async function StrengthDetails({ goal }: { goal: Tables<"goals"> }) {
   const lifts = p.focus_lifts ?? [];
   const supabase = await createClient();
   const { data } = await supabase
-    .from("gym_sessions")
-    .select("exercise, weight_kg, reps, date")
-    .gte("date", goal.created_at.slice(0, 10))
-    .not("weight_kg", "is", null);
+    .from("workouts")
+    .select("workout_exercises(exercises(name), workout_sets(weight_kg, is_warmup))")
+    .eq("status", "completed")
+    .gte("date", goal.created_at.slice(0, 10));
+  // Heaviest working set per exercise name since the goal started.
+  const sets = (data ?? []).flatMap((w) =>
+    w.workout_exercises.flatMap((we) =>
+      we.workout_sets
+        .filter((s) => !s.is_warmup)
+        .map((s) => ({ exercise: we.exercises?.name ?? "", weight_kg: Number(s.weight_kg) })),
+    ),
+  );
 
   const best = (lift: string) =>
-    (data ?? [])
+    sets
       .filter((g) => g.exercise.toLowerCase().includes(lift.toLowerCase()))
-      .reduce<number | null>((m, g) => Math.max(m ?? 0, g.weight_kg ?? 0), null);
+      .reduce<number | null>((m, g) => Math.max(m ?? 0, g.weight_kg), null);
 
   return (
     <div className="flex flex-col gap-2">

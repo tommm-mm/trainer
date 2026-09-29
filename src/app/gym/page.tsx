@@ -1,6 +1,7 @@
 import { PageShell } from "@/components/bottom-nav";
 import { createClient } from "@/lib/supabase/server";
-import { addDays, todayISO } from "@/lib/dates";
+import { addDays, mondayOf, todayISO } from "@/lib/dates";
+import { loadStrength } from "@/lib/gym/queries";
 import {
   storeFromServer,
   type ExerciseInfo,
@@ -13,11 +14,18 @@ import { GymApp, type RecentWorkout } from "./gym-app";
 
 const HISTORY_DAYS = 180;
 
-export default async function GymPage() {
+export default async function GymPage({ searchParams }: PageProps<"/gym">) {
+  const params = await searchParams;
+  const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+  const planned =
+    str(params.plan) || str(params.template)
+      ? { planId: str(params.plan), templateId: str(params.template) }
+      : null;
   const today = todayISO();
+  const monday = mondayOf(today);
   const supabase = await createClient();
 
-  const [tplRes, exRes, histRes, activeRes] = await Promise.all([
+  const [tplRes, exRes, histRes, activeRes, week] = await Promise.all([
     supabase
       .from("workout_templates")
       .select(
@@ -50,6 +58,7 @@ export default async function GymPage() {
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    loadStrength(supabase, { from: monday, to: addDays(monday, 6) }).catch(() => null),
   ]);
   const loadError = tplRes.error ?? exRes.error ?? histRes.error ?? activeRes.error;
 
@@ -105,6 +114,9 @@ export default async function GymPage() {
         history={history}
         recent={recent}
         serverActive={serverActive}
+        weekSessions={week?.sessions ?? []}
+        index={week?.index ?? {}}
+        planned={planned}
       />
     </PageShell>
   );

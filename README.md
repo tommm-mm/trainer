@@ -11,7 +11,7 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | 2 | Week View, Log Workout, Goal Overview, seed goal | ✅ |
 | A | London region, Garmin sync via intervals.icu, auto-tick plans, post-workout feedback | ✅ |
 | B | Check-in + Analytics (volume, long-run share, ACWR, monotony, HR trend) | ✅ |
-| G | Gym logger: templates, live set logging (offline-safe), Garmin link | 🟡 step 1 |
+| G | Gym logger, template editor, gym Stats, Today card, live meters, auto-refresh | ✅ |
 | C | Stub `/api/generate-week` + "Generate my week" | ⏳ |
 | D | Real Claude call + goal-type branching + flags | ⏳ |
 | E | Scheduled AI draft (Vercel Cron, 2x/week) | ⏳ |
@@ -37,6 +37,20 @@ Schema: `exercises` (starter library with `user_id` NULL + your own), `workout_t
 - **Prefill:** previous set today → last time's first working set → template target.
 - **Finish:** session RPE → linked Garmin activity's `rpe` (so it counts in sRPE load once) and its feedback card is answered.
 - Opening `/gym` needs signal once (no service worker until Phase F); after that the workout runs offline.
+- **Templates** (`/gym/templates`): sets × rep range @ RIR, rest, main/finisher per exercise. Week View gym plans can point at one (Start workout); finishing completes the plan.
+- **Live:** `LiveRefresh` (in `PageShell`) listens to Supabase Realtime on `activities`, `weekly_plans`, `exercise_targets`, `checkins` and finished `workouts`, and refreshes the screen; muscle meters in the logger include the workout in progress.
+- **Today card** (Week View): rule-based suggestion (`src/lib/gym/today.ts`: plan first, next template in rotation, 48 h between full-body sessions) until the AI coach plans the week.
+
+## Strength metrics (`src/lib/strength.ts`)
+
+| Metric | Formula / source |
+|---|---|
+| e1RM | RIR-adjusted Epley: `weight × (1 + (reps + RIR)/30)`; only reps + RIR ≤ 12; unrated RIR = 0 (lower bound). Trend per lift = least-squares slope, % of level per week |
+| Hard sets / muscle | Main-block working sets at RIR ≤ 4; primary ×1, secondary ×0.5. Reference 10–20/week (Schoenfeld 2017; Pelland 2024); ≈⅓ maintains (Bickel 2011). Calves and core not judged |
+| Tonnage | Σ weight × reps of working sets (bodyweight: added load) |
+| PRs | Session best e1RM or heaviest working weight beating all earlier sessions |
+| Adherence | Prescribed main-block working sets done (capped per exercise); share of rated sets within ±1 RIR of target |
+| Load | Unlinked workouts count as `duration × session RPE`; linked ones only via their Garmin activity |
 
 ## Metrics (`src/lib/metrics.ts`)
 

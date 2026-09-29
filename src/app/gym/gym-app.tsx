@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { btnSecondary, cardCls } from "@/components/ui";
 import { formatDay, todayISO } from "@/lib/dates";
+import { MuscleMeters } from "@/components/muscle-meters";
+import { nextTemplate } from "@/lib/gym/today";
+import { muscleSets, type ExerciseIndex, type StrengthSession } from "@/lib/strength";
 import {
   addExercise,
   currentExerciseIndex,
@@ -13,6 +16,7 @@ import {
   lastTimeByExercise,
   startWorkout,
   swapExercise,
+  toStrengthSession,
   type ExerciseInfo,
   type HistoryRow,
   type Store,
@@ -43,11 +47,25 @@ type Props = {
   history: HistoryRow[];
   recent: RecentWorkout[];
   serverActive: Store | null;
+  /** Completed workouts this week + exercise index: the live muscle meters. */
+  weekSessions: StrengthSession[];
+  index: ExerciseIndex;
+  /** Opened from a planned session on the Week View. */
+  planned: { planId: string | null; templateId: string | null } | null;
 };
 
 const uuid = () => crypto.randomUUID();
 
-export function GymApp({ templates, exercises, history, recent, serverActive }: Props) {
+export function GymApp({
+  templates,
+  exercises,
+  history,
+  recent,
+  serverActive,
+  weekSessions,
+  index,
+  planned,
+}: Props) {
   const router = useRouter();
   const onDone = useCallback(() => router.refresh(), [router]);
   const { store, setStore, loaded, sync, lastError, finished, setFinished, pushNow } = useWorkout(
@@ -63,6 +81,18 @@ export function GymApp({ templates, exercises, history, recent, serverActive }: 
     return m;
   }, [exercises, store?.doc.newExercises]);
   const lastTime = useMemo(() => lastTimeByExercise(history), [history]);
+  // Exercises created mid-workout aren't in the server index yet.
+  const fullIndex = useMemo(() => {
+    const out: ExerciseIndex = { ...index };
+    for (const e of store?.doc.newExercises ?? []) out[e.id] = e;
+    return out;
+  }, [index, store?.doc.newExercises]);
+  // This week's hard sets, including the workout in progress: fills up as you log.
+  const liveMuscles = useMemo(() => {
+    const done = weekSessions.filter((w) => w.id !== store?.doc.id);
+    const current = store && store.doc.status === "in_progress" ? [toStrengthSession(store.doc)] : [];
+    return muscleSets([...done, ...current], fullIndex);
+  }, [weekSessions, store, fullIndex]);
 
   if (!loaded) return <p className="py-10 text-center text-sm text-neutral-500">Loading…</p>;
 
@@ -73,8 +103,10 @@ export function GymApp({ templates, exercises, history, recent, serverActive }: 
         byId={byId}
         recent={recent}
         finished={finished}
+        planned={planned}
+        muscles={liveMuscles}
         onDismiss={() => setFinished(null)}
-        onStart={(template) => {
+        onStart={(template, planId) => {
           setFinished(null);
           rest.clear();
           setStore(
@@ -83,6 +115,7 @@ export function GymApp({ templates, exercises, history, recent, serverActive }: 
               date: todayISO(),
               now: new Date().toISOString(),
               template,
+              planId,
               newId: uuid,
             }),
           );
@@ -102,6 +135,7 @@ export function GymApp({ templates, exercises, history, recent, serverActive }: 
       lastError={lastError}
       onRetry={() => void pushNow()}
       rest={rest}
+      muscles={liveMuscles}
     />
   );
 }
@@ -113,6 +147,8 @@ function Home({
   byId,
   recent,
   finished,
+  planned,
+  muscles,
   onStart,
   onDismiss,
 }: {
@@ -120,19 +156,28 @@ function Home({
   byId: Map<string, ExerciseInfo>;
   recent: RecentWorkout[];
   finished: { linked: boolean } | null;
-  onStart: (t: TemplateInput | null) => void;
+  planned: Props["planned"];
+  muscles: ReturnType<typeof muscleSets>;
+  onStart: (t: TemplateInput | null, planId: string | null) => void;
   onDismiss: () => void;
 }) {
-  // Rotation: the template after the one you did last.
-  const lastTpl = recent.find((r) => r.templateId)?.templateId ?? null;
-  const lastIdx = templates.findIndex((t) => t.id === lastTpl);
-  const nextId = templates.length ? templates[(lastIdx + 1) % templates.length].id : null;
+  // A planned session picks the template; otherwise rotate after the last one done.
+  const rotation = nextTemplate(templates, recent.find((r) => r.templateId)?.templateId ?? null);
+  const nextId = planned?.templateId ?? rotation?.id ?? null;
+  const planId = planned?.planId ?? null;
+  // The suggested workout goes first.
+  const ordered = [...templates].sort((a, b) => Number(b.id === nextId) - Number(a.id === nextId));
 
   return (
     <div className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">Gym</h1>
-        <p className="text-sm text-neutral-400">Pick a workout and log sets as you go.</p>
+      <header className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Gym</h1>
+          <p className="text-sm text-neutral-400">Pick a workout and log sets as you go.</p>
+        </div>
+        <Link href="/gym/templates" className="shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-xs text-neutral-300">
+          Edit workouts
+        </Link>
       </header>
 
       {finished && (
@@ -150,7 +195,7 @@ function Home({
       )}
 
       <ul className="flex flex-col gap-3">
-        {templates.map((t) => {
+        {ordered.map((t) => {
           const last = recent.find((r) => r.templateId === t.id);
           const main = t.items.filter((i) => i.block === "main");
           const fin = t.items.filter((i) => i.block === "finisher");
@@ -160,7 +205,7 @@ function Home({
                 <h2 className="font-semibold">{t.name}</h2>
                 {t.id === nextId && (
                   <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">
-                    Next up
+                    {planned?.planId && planned.templateId === t.id ? "Planned today" : "Next up"}
                   </span>
                 )}
               </div>
@@ -177,7 +222,7 @@ function Home({
                   {last ? `Last: ${formatDay(last.date)}` : "Not done yet"}
                 </span>
                 <button
-                  onClick={() => onStart(t)}
+                  onClick={() => onStart(t, t.id === nextId ? planId : null)}
                   className="h-12 rounded-xl bg-emerald-500 px-6 text-base font-semibold text-neutral-950 active:bg-emerald-400"
                 >
                   Start
@@ -188,9 +233,13 @@ function Home({
         })}
       </ul>
 
-      <button onClick={() => onStart(null)} className={`${btnSecondary} h-12`}>
+      <button onClick={() => onStart(null, planned?.templateId ? null : planId)} className={`${btnSecondary} h-12`}>
         Start an empty workout
       </button>
+
+      <section className={cardCls}>
+        <MuscleMeters sets={muscles} />
+      </section>
 
       {recent.length > 0 && (
         <section>
@@ -234,7 +283,9 @@ function ActiveWorkout({
   lastError,
   onRetry,
   rest,
+  muscles,
 }: {
+  muscles: ReturnType<typeof muscleSets>;
   store: Store;
   setStore: (next: Store | ((cur: Store | null) => Store | null)) => void;
   byId: Map<string, ExerciseInfo>;
@@ -333,6 +384,15 @@ function ActiveWorkout({
       <button onClick={() => setPicker({ mode: "add" })} className={`${btnSecondary} h-12`}>
         + Add exercise
       </button>
+
+      <details className={`${cardCls} mt-2`}>
+        <summary className="cursor-pointer text-sm font-medium">
+          This week&apos;s muscle volume <span className="text-xs font-normal text-emerald-400">live</span>
+        </summary>
+        <div className="mt-3">
+          <MuscleMeters sets={muscles} title="Hard sets this week, incl. today" />
+        </div>
+      </details>
 
       <RestBar rest={rest} />
 

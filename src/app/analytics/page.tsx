@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { addDays, daysBetween, formatLongDate, todayISO } from "@/lib/dates";
 import { fetchHrSettings } from "@/lib/intervals";
 import { BACKFILL_DAYS } from "@/lib/sync";
+import { loadStrength } from "@/lib/gym/queries";
 import { ImportHistory } from "./import-history";
 import { WEEKS, buildStats, statsFrom } from "./model";
 import { StatsView } from "./stats-view";
@@ -11,7 +12,7 @@ export default async function AnalyticsPage() {
   const today = todayISO();
 
   const supabase = await createClient();
-  const [actsRes, firstRes, bodyRes, hr] = await Promise.all([
+  const [actsRes, firstRes, bodyRes, hr, strength] = await Promise.all([
     supabase
       .from("activities")
       .select("date, type, distance_km, duration_min, avg_hr, max_hr, rpe")
@@ -25,6 +26,7 @@ export default async function AnalyticsPage() {
       .gte("date", addDays(today, -180))
       .order("date"),
     fetchHrSettings(addDays(today, -30), today),
+    loadStrength(supabase, { from: statsFrom(today), to: today }).catch(() => null),
   ]);
   const loadError = actsRes.error ?? firstRes.error ?? bodyRes.error;
   const historyStart = firstRes.data?.date ?? null;
@@ -35,6 +37,9 @@ export default async function AnalyticsPage() {
     historyStart,
     body: bodyRes.data ?? [],
     hr,
+    gym: strength
+      ? { sessions: strength.sessions, index: strength.index, target: Math.max(strength.activeTemplates, 1) }
+      : undefined,
   });
   const shortHistory = !historyStart || daysBetween(historyStart, today) < WEEKS * 7;
 

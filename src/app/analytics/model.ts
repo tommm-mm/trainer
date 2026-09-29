@@ -43,6 +43,8 @@ import {
   type Verdict,
 } from "@/lib/assess";
 import type { Series, Threshold, Zone } from "./charts";
+import { buildGymStats, type GymInput, type GymModel } from "./gym-model";
+import { unlinkedWorkoutActivities } from "@/lib/strength";
 import { formatValue, type ValueFormat } from "./format";
 import { COLORS } from "./theme";
 
@@ -56,6 +58,8 @@ export type StatsInput = {
   historyStart: string | null;
   body: { date: string; weight_kg: number | null; body_fat_pct: number | null }[];
   hr: { restHr: number | null; maxHr: number | null };
+  /** Logged workouts; unlinked ones are added to the load as gym sessions. */
+  gym?: Omit<GymInput, "today" | "weeks">;
 };
 
 export type ChartSpec = {
@@ -69,15 +73,24 @@ export type ChartSpec = {
   domain?: [number, number];
   ticks?: number[];
   reversed?: boolean;
+  allLabels?: boolean;
 };
+
+export type Table = { headers: string[]; rows: string[][] };
+
+/** One of several charts in a block, picked with a chip (e.g. one per lift). */
+export type Variant = { key: string; label: string; note?: string; chart: ChartSpec; table?: Table };
 
 export type Block = {
   id: string;
   title: string;
   verdict: Verdict | null;
   how: string;
-  chart: ChartSpec;
-  table?: { headers: string[]; rows: string[][] };
+  chart?: ChartSpec;
+  variants?: Variant[];
+  table?: Table;
+  /** Show the table without "Show numbers" (table-only cards). */
+  tableOpen?: boolean;
 };
 
 export type StatsModel = {
@@ -88,8 +101,9 @@ export type StatsModel = {
   tiles: { label: string; value: string; verdict: Verdict | null }[];
   coach: Insight[];
   /** Titles + values of everything currently on point (shown under the coach's read). */
-  onPoint: { id: string; title: string; value: string | null }[];
+  onPoint: { id: string; anchor?: string; title: string; value: string | null }[];
   blocks: Block[];
+  gym: GymModel | null;
 };
 
 /** First date the page needs: 12 weeks of charts + 28 days of ACWR warm-up. */
@@ -98,7 +112,10 @@ export function statsFrom(today: string): string {
 }
 
 export function buildStats(input: StatsInput): StatsModel {
-  const { today, activities: acts } = input;
+  const { today } = input;
+  // Workouts not linked to a Garmin session carry their own duration × session RPE.
+  const acts = input.gym ? [...input.activities, ...unlinkedWorkoutActivities(input.gym.sessions)] : input.activities;
+  const gym = input.gym ? buildGymStats({ today, weeks: WEEKS, ...input.gym }) : null;
   const weeks = weekStarts(today, WEEKS);
   const from = statsFrom(today);
   const complete = (w: string) => isCompleteWeek(w, today);
@@ -222,13 +239,13 @@ export function buildStats(input: StatsInput): StatsModel {
       })),
       bars: [
         { key: "run", name: "Run", color: COLORS.run, stackId: "l" },
-        { key: "gym", name: "Gym", color: COLORS.gym, stackId: "l" },
+        { key: "gym", name: "Gym + HIIT", color: COLORS.gym, stackId: "l" },
       ],
       trend: { key: "avg", name: "4-week average" },
       format: "load",
     },
     table: {
-      headers: ["Week", "Run", "Gym", "Total"],
+      headers: ["Week", "Run", "Gym+HIIT", "Total"],
       rows: weeklyLoad.map((w) => [
         label(w.week) + (complete(w.week) ? "" : "*"),
         formatNumber(w.run, 0),
@@ -406,12 +423,13 @@ export function buildStats(input: StatsInput): StatsModel {
     { id: "pace", title: "Aerobic fitness", verdict: v.aerobic },
     { id: "easy-hr", title: "Easy-run HR", verdict: v.easyHr },
     { id: "load", title: "Effort ratings", verdict: v.rpe },
+    ...(gym?.hasData ? gym.insights : []),
   ];
   // The card leads with what needs attention; what's fine goes in one line.
   const coach = coachRead(insights.filter((i) => i.verdict.status !== "good"));
   const onPoint = insights
     .filter((i) => i.verdict.status === "good")
-    .map((i) => ({ id: i.id, title: i.title, value: i.verdict.value }));
+    .map((i) => ({ id: i.id, anchor: i.anchor, title: i.title, value: i.verdict.value }));
 
   return {
     anchors,
@@ -421,6 +439,7 @@ export function buildStats(input: StatsInput): StatsModel {
     coach,
     onPoint,
     blocks,
+    gym,
     tiles: [
       { label: "ACWR", value: v.acwr.value ?? "–", verdict: v.acwr },
       { label: "Monotony 7 d", value: v.monotony.value ?? "–", verdict: v.monotony },

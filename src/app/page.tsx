@@ -15,12 +15,18 @@ import {
   weekDays,
 } from "@/lib/dates";
 import { formatNumber } from "@/lib/format";
+import { sessionKind, sessionLabel } from "@/lib/sessions";
+import { loadStrength } from "@/lib/gym/queries";
+import { todayAction } from "@/lib/gym/today";
+import { muscleSets, type StrengthSession } from "@/lib/strength";
+import { MuscleMeters } from "@/components/muscle-meters";
 import { signOut } from "./actions";
 import { approveWeek, resolveFlag } from "./week/actions";
-import { PlanRow } from "./week/plan-row";
+import { PlanRow, type PlanTemplate } from "./week/plan-row";
 import { AddSession } from "./week/add-session";
 import { SyncButton } from "./week/sync-button";
 import { FeedbackCard } from "./week/feedback-card";
+import { TodayCard } from "./week/today-card";
 
 export default async function WeekPage({ searchParams }: PageProps<"/">) {
   const { week } = await searchParams;
@@ -30,7 +36,18 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
   const isCurrentWeek = monday === mondayOf(today);
 
   const supabase = await createClient();
-  const [plansRes, activitiesRes, gymRes, flagsRes, goal, feedbackRes, lastCheckinRes] = await Promise.all([
+  const [
+    plansRes,
+    activitiesRes,
+    flagsRes,
+    goal,
+    feedbackRes,
+    lastCheckinRes,
+    templatesRes,
+    openWorkoutRes,
+    recentWorkoutsRes,
+    strength,
+  ] = await Promise.all([
     supabase
       .from("weekly_plans")
       .select("*")
@@ -43,12 +60,6 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .gte("date", monday)
       .lte("date", sunday)
       .order("date"),
-    supabase
-      .from("gym_sessions")
-      .select("*")
-      .gte("date", monday)
-      .lte("date", sunday)
-      .order("created_at"),
     supabase
       .from("flags")
       .select("*")
@@ -70,15 +81,37 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .order("date", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("workout_templates")
+      .select("id, name, position, template_exercises(position, block, exercises(name))")
+      .eq("archived", false)
+      .order("position"),
+    supabase.from("workouts").select("id").eq("status", "in_progress").limit(1).maybeSingle(),
+    supabase
+      .from("workouts")
+      .select("date, template_id")
+      .eq("status", "completed")
+      .order("started_at", { ascending: false })
+      .limit(5),
+    loadStrength(supabase, { from: monday, to: sunday }).catch(() => null),
   ]);
 
   const plans = plansRes.data ?? [];
   const activities = activitiesRes.data ?? [];
-  const gym = gymRes.data ?? [];
+  const workouts = strength?.sessions ?? [];
+  const templates: PlanTemplate[] = (templatesRes.data ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    exercises: [...t.template_exercises]
+      .filter((e) => e.block === "main")
+      .sort((a, b) => a.position - b.position)
+      .map((e) => e.exercises?.name ?? "?"),
+  }));
+  const templateName = new Map(templates.map((t) => [t.id, t.name]));
   const flags = flagsRes.data ?? [];
   const pendingFeedback = feedbackRes.data ?? [];
   const nextFeedback = pendingFeedback[0];
-  const loadError = plansRes.error ?? activitiesRes.error ?? gymRes.error ?? flagsRes.error;
+  const loadError = plansRes.error ?? activitiesRes.error ?? flagsRes.error ?? templatesRes.error;
   const proposedCount = plans.filter((p) => p.status === "proposed").length;
   // Gentle nudge when there's no check-in in the last 4 days (today included).
   const lastCheckin = lastCheckinRes.data?.date ?? null;
@@ -90,6 +123,38 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
   const doneKm = activities
     .filter((a) => a.type === "run")
     .reduce((s, a) => s + (a.distance_km ?? 0), 0);
+
+  // Gym days this week: logged workouts plus Garmin strength sessions logged elsewhere.
+  const gymDates = [
+    ...new Set([...workouts.map((w) => w.date), ...activities.filter((a) => a.type === "gym").map((a) => a.date)]),
+  ].sort();
+  const recentWorkouts = recentWorkoutsRes.data ?? [];
+  const lastGymDate =
+    [...gymDates.filter((d) => d < today), ...recentWorkouts.filter((w) => w.date < today).map((w) => w.date)]
+      .sort()
+      .at(-1) ?? null;
+  const action = isCurrentWeek
+    ? todayAction({
+        today,
+        inProgress: !!openWorkoutRes.data,
+        plannedToday: plans
+          .filter((p) => p.day === today && p.status !== "completed" && p.status !== "proposed")
+          .map((p) => ({
+            id: p.id,
+            label: sessionLabel(p.session_type),
+            kind: sessionKind(p.session_type),
+            templateId: p.template_id,
+          })),
+        gymDoneToday: gymDates.includes(today),
+        runDoneToday: activities.some((a) => a.type === "run" && a.date === today),
+        gymDatesThisWeek: gymDates.filter((d) => d <= today),
+        lastGymDate,
+        gymTarget: Math.max(templates.length, 1),
+        templates,
+        lastTemplateId: recentWorkouts.find((w) => w.template_id)?.template_id ?? null,
+      })
+    : null;
+  const weekMuscles = strength ? muscleSets(workouts, strength.index) : null;
 
   return (
     <PageShell active="/">
@@ -111,14 +176,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
         <SyncButton />
       </div>
 
-      {isCurrentWeek && (
-        <Link
-          href="/gym"
-          className="mb-4 flex h-12 items-center justify-center rounded-xl bg-emerald-500 text-base font-semibold text-neutral-950"
-        >
-          🏋️ Start gym workout
-        </Link>
-      )}
+      {action && <TodayCard action={action} templateName={templateName} />}
 
       <nav className="mb-4 flex items-center gap-2">
         <Link href={`/?week=${addDays(monday, -7)}`} className={btnSmall}>
@@ -206,10 +264,23 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
         </Link>
       )}
 
-      <section className="mb-4 grid grid-cols-2 gap-2">
-        <Stat label="Planned run km" value={formatNumber(plannedKm)} />
-        <Stat label="Done run km" value={formatNumber(doneKm)} />
+      <section className="mb-4 grid grid-cols-3 gap-2">
+        <Stat label="Planned km" value={formatNumber(plannedKm)} />
+        <Stat label="Run km" value={formatNumber(doneKm)} />
+        <Stat label="Gym sessions" value={`${gymDates.length}/${Math.max(templates.length, 1)}`} />
       </section>
+
+      {weekMuscles && workouts.length > 0 && (
+        <details className={`${cardCls} mb-4`}>
+          <summary className="cursor-pointer text-sm font-medium">
+            Muscle volume this week
+            <span className="ml-2 text-xs font-normal text-neutral-500">tap to open</span>
+          </summary>
+          <div className="mt-3">
+            <MuscleMeters sets={weekMuscles} />
+          </div>
+        </details>
+      )}
 
       <div className="mb-4 flex gap-2">
         <button
@@ -236,7 +307,9 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
             isToday={day === today}
             plans={plans.filter((p) => p.day === day)}
             activities={activities.filter((a) => a.date === day)}
-            gym={gym.filter((g) => g.date === day)}
+            workouts={workouts.filter((w) => w.date === day)}
+            templates={templates}
+            templateName={templateName}
           />
         ))}
       </ol>
@@ -284,17 +357,28 @@ function DayCard({
   isToday,
   plans,
   activities,
-  gym,
+  workouts,
+  templates,
+  templateName,
 }: {
   day: string;
   isToday: boolean;
   plans: Tables<"weekly_plans">[];
   activities: Tables<"activities">[];
-  gym: Tables<"gym_sessions">[];
+  workouts: StrengthSession[];
+  templates: PlanTemplate[];
+  templateName: Map<string, string>;
 }) {
   const runs = activities.filter((a) => a.type === "run");
-  const garminGym = activities.filter((a) => a.type === "gym" || a.type === "cardio");
-  const hasLogs = runs.length > 0 || garminGym.length > 0 || gym.length > 0;
+  // Garmin strength sessions linked to a logged workout are shown on the workout line.
+  const linked = new Map(
+    workouts.filter((w) => w.activity_id).map((w) => [w.activity_id!, w]),
+  );
+  const byId = new Map(activities.map((a) => [a.id, a]));
+  const garminGym = activities.filter(
+    (a) => (a.type === "gym" || a.type === "cardio") && !linked.has(a.id),
+  );
+  const hasLogs = runs.length > 0 || garminGym.length > 0 || workouts.length > 0;
 
   return (
     <li className={`${cardCls} ${isToday ? "border-emerald-500/50" : ""}`}>
@@ -304,7 +388,7 @@ function DayCard({
           {isToday && <span className="ml-2 text-xs font-normal">today</span>}
         </h2>
         <Link href={`/log?date=${day}`} className="text-xs text-neutral-500 hover:text-neutral-300">
-          + Log
+          + Log run
         </Link>
       </div>
 
@@ -313,7 +397,7 @@ function DayCard({
           <p className="text-xs text-neutral-600">Nothing planned.</p>
         )}
         {plans.map((p) => (
-          <PlanRow key={p.id} plan={p} />
+          <PlanRow key={p.id} plan={p} templates={templates} />
         ))}
 
         {hasLogs && (
@@ -337,18 +421,28 @@ function DayCard({
                 <span className="text-neutral-500"> · Garmin</span>
               </p>
             ))}
-            {gym.length > 0 && (
-              <p>
-                🏋️ {gym.map((g) => g.exercise).join(", ")}
-                {gym.some((g) => g.garmin_confirmed) && (
-                  <span className="text-emerald-400"> · ✓ Garmin</span>
-                )}
-              </p>
-            )}
+            {workouts.map((w) => {
+              const act = w.activity_id ? byId.get(w.activity_id) : undefined;
+              const sets = w.slots.reduce((n, s) => n + s.sets.filter((x) => !x.is_warmup).length, 0);
+              return (
+                <p key={w.id}>
+                  🏋️ {(w.template_id && templateName.get(w.template_id)) || "Workout"} · {sets} sets
+                  {w.session_rpe !== null && ` · RPE ${w.session_rpe}`}
+                  {act ? (
+                    <span className="text-emerald-400">
+                      {" "}
+                      · ✓ Garmin {formatNumber(act.duration_min, 0)} min{act.avg_hr ? ` · ${act.avg_hr} bpm` : ""}
+                    </span>
+                  ) : (
+                    w.minutes !== null && ` · ${w.minutes} min`
+                  )}
+                </p>
+              );
+            })}
           </div>
         )}
 
-        <AddSession day={day} />
+        <AddSession day={day} templates={templates} />
       </div>
     </li>
   );

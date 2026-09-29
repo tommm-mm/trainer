@@ -3,8 +3,9 @@ import { btnDanger } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { formatDay, isISODate, todayISO } from "@/lib/dates";
 import { formatNumber } from "@/lib/format";
+import { redirect } from "next/navigation";
 import { sessionKind, sessionLabel } from "@/lib/sessions";
-import { deleteActivity, deleteGymSession } from "./actions";
+import { deleteActivity } from "./actions";
 import { LogForm } from "./log-form";
 
 export default async function LogPage({ searchParams }: PageProps<"/log">) {
@@ -14,7 +15,7 @@ export default async function LogPage({ searchParams }: PageProps<"/log">) {
 
   const supabase = await createClient();
 
-  const [planRes, activitiesRes, gymRes] = await Promise.all([
+  const [planRes, activitiesRes] = await Promise.all([
     planId
       ? supabase.from("weekly_plans").select("*").eq("id", planId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -23,53 +24,41 @@ export default async function LogPage({ searchParams }: PageProps<"/log">) {
       .select("*")
       .order("date", { ascending: false })
       .order("created_at", { ascending: false })
-      .limit(10),
-    supabase
-      .from("gym_sessions")
-      .select("*")
-      .order("date", { ascending: false })
-      .order("created_at", { ascending: false })
       .limit(15),
   ]);
 
   const plan = planRes.data;
+  // Gym sessions are logged set by set in the gym logger.
+  if (plan && sessionKind(plan.session_type) === "gym") {
+    redirect(`/gym?plan=${plan.id}${plan.template_id ? `&template=${plan.template_id}` : ""}`);
+  }
   const date = plan?.day ?? (isISODate(dateParam) ? dateParam : todayISO());
-  const initialMode = plan && sessionKind(plan.session_type) === "gym" ? "gym" : "run";
 
-  // Merge runs/Garmin activities and manual gym rows into one recent list.
-  const recent = [
-    ...(activitiesRes.data ?? []).map((a) => ({
-      id: a.id,
-      date: a.date,
-      created: a.created_at,
-      kind: "activity" as const,
-      text:
-        a.type === "run"
-          ? `🏃 ${formatNumber(a.distance_km)} km${a.avg_pace ? ` · ${a.avg_pace}/km` : ""}${a.rpe ? ` · RPE ${a.rpe}` : ""}`
-          : `🏋️ Strength ${formatNumber(a.duration_min, 0)} min`,
-      source: a.source,
-    })),
-    ...(gymRes.data ?? []).map((g) => ({
-      id: g.id,
-      date: g.date,
-      created: g.created_at,
-      kind: "gym" as const,
-      text: `🏋️ ${g.exercise} ${g.sets ?? "–"}×${g.reps ?? "–"}${g.weight_kg ? ` @ ${formatNumber(g.weight_kg)} kg` : ""}`,
-      source: g.garmin_confirmed ? "✓ garmin" : "manual",
-    })),
-  ]
-    .sort((a, b) => (b.date + b.created).localeCompare(a.date + a.created))
-    .slice(0, 15);
+  const recent = (activitiesRes.data ?? []).map((a) => ({
+    id: a.id,
+    date: a.date,
+    text:
+      a.type === "run"
+        ? `🏃 ${formatNumber(a.distance_km)} km${a.avg_pace ? ` · ${a.avg_pace}/km` : ""}${a.rpe ? ` · RPE ${a.rpe}` : ""}`
+        : `${a.type === "cardio" ? "⚡ HIIT" : "🏋️ Strength"} ${formatNumber(a.duration_min, 0)} min`,
+    source: a.source,
+  }));
 
   return (
-    <PageShell active="/log">
-      <h1 className="mb-4 text-xl font-semibold tracking-tight">Log workout</h1>
+    <PageShell active="/gym">
+      <h1 className="mb-1 text-xl font-semibold tracking-tight">Log a run</h1>
+      <p className="mb-4 text-sm text-neutral-400">
+        For runs without the watch. Garmin runs sync by themselves; gym sessions go in the{" "}
+        <a href="/gym" className="text-emerald-400">
+          gym logger
+        </a>
+        .
+      </p>
 
       <LogForm
         // Re-mount when switching between planned sessions.
         key={plan?.id ?? date}
         date={date}
-        initialMode={initialMode}
         plan={
           plan && {
             id: plan.id,
@@ -97,7 +86,7 @@ export default async function LogPage({ searchParams }: PageProps<"/log">) {
                 </div>
                 {r.source !== "garmin" && (
                   <form
-                    action={(r.kind === "gym" ? deleteGymSession : deleteActivity).bind(null, r.id)}
+                    action={deleteActivity.bind(null, r.id)}
                   >
                     <button className={btnDanger}>Delete</button>
                   </form>
