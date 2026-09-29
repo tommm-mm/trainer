@@ -111,6 +111,15 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
         <SyncButton />
       </div>
 
+      {isCurrentWeek && (
+        <Link
+          href="/gym"
+          className="mb-4 flex h-12 items-center justify-center rounded-xl bg-emerald-500 text-base font-semibold text-neutral-950"
+        >
+          🏋️ Start gym workout
+        </Link>
+      )}
+
       <nav className="mb-4 flex items-center gap-2">
         <Link href={`/?week=${addDays(monday, -7)}`} className={btnSmall}>
           ‹ Prev
@@ -284,7 +293,7 @@ function DayCard({
   gym: Tables<"gym_sessions">[];
 }) {
   const runs = activities.filter((a) => a.type === "run");
-  const garminGym = activities.filter((a) => a.type === "gym");
+  const garminGym = activities.filter((a) => a.type === "gym" || a.type === "cardio");
   const hasLogs = runs.length > 0 || garminGym.length > 0 || gym.length > 0;
 
   return (
@@ -322,7 +331,8 @@ function DayCard({
             ))}
             {garminGym.map((g) => (
               <p key={g.id}>
-                🏋️ {g.name ?? "Strength"} {formatNumber(g.duration_min, 0)} min
+                {g.type === "cardio" ? "⚡" : "🏋️"} {g.name ?? (g.type === "cardio" ? "HIIT" : "Strength")}{" "}
+                {formatNumber(g.duration_min, 0)} min
                 {g.avg_hr && ` · ${g.avg_hr} bpm`}
                 <span className="text-neutral-500"> · Garmin</span>
               </p>

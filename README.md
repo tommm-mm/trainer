@@ -11,6 +11,7 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | 2 | Week View, Log Workout, Goal Overview, seed goal | ✅ |
 | A | London region, Garmin sync via intervals.icu, auto-tick plans, post-workout feedback | ✅ |
 | B | Check-in + Analytics (volume, long-run share, ACWR, monotony, HR trend) | ✅ |
+| G | Gym logger: templates, live set logging (offline-safe), Garmin link | 🟡 step 1 |
 | C | Stub `/api/generate-week` + "Generate my week" | ⏳ |
 | D | Real Claude call + goal-type branching + flags | ⏳ |
 | E | Scheduled AI draft (Vercel Cron, 2x/week) | ⏳ |
@@ -22,10 +23,20 @@ Garmin Connect → intervals.icu (their side) → `POST /api/sync` → `activiti
 
 - Runs automatically when the Week View opens (at most every 10 min) and on the "↻ Garmin" button.
 - Window: last 30 days on first sync, then from the latest synced day − 3 days. Idempotent (unique `user_id, external_id`).
-- Runs / trail / virtual / treadmill → `run`; weight training → `gym`; other sports are skipped.
+- Runs / trail / virtual / treadmill → `run`; `WeightTraining` → `gym`; `Workout` / `HIIT` / `Crossfit` → `cardio` (HIIT finishers: count in load, not as gym sessions) unless the Garmin name says strength ("Pesi"). The raw type is kept in `activities.sport_type`. Other sports are skipped.
 - Same-day `approved`/`edited` plan of the same kind → `completed`. `proposed` plans are never touched.
 - Same-day manual gym logs → `garmin_confirmed = true`.
+- Completed gym workouts → linked to the longest same-day `gym` activity (`workouts.activity_id`); the session RPE is copied onto it.
 - Each synced workout shows a feedback card (feeling, RPE, notes). "Pain" creates a `pain_reported` flag.
+
+## Gym logger (`/gym`)
+
+Schema: `exercises` (starter library with `user_id` NULL + your own), `workout_templates` → `template_exercises` (sets × rep range @ RIR, `main`/`finisher` block), `workouts` → `workout_exercises` → `workout_sets`. `exercise_targets` holds per-week overrides for Phase C (engine writes `proposed`, you approve). Migration: `supabase/migrations/20260929120000_gym_logger.sql`.
+
+- **Local-first:** the in-progress workout lives in `localStorage`; every edit bumps a revision and is pushed as idempotent upserts on client-generated UUIDs (`src/lib/gym/push.ts`). Offline edits retry on reconnect and every 10 s; deletes are tombstoned until confirmed. Logic is pure and tested in `src/lib/gym/workout.ts`.
+- **Prefill:** previous set today → last time's first working set → template target.
+- **Finish:** session RPE → linked Garmin activity's `rpe` (so it counts in sRPE load once) and its feedback card is answered.
+- Opening `/gym` needs signal once (no service worker until Phase F); after that the workout runs offline.
 
 ## Metrics (`src/lib/metrics.ts`)
 
@@ -62,7 +73,9 @@ src/
   app/login/                # email/password sign-in (no signup)
   app/page.tsx              # Week View (plans, logs, flags, approve/edit/complete)
   app/week/                 # Week View actions + client components
-  app/log/                  # Log Workout (run → activities, gym → gym_sessions)
+  app/gym/                  # Gym logger (templates, live sets, rest timer, finish)
+  lib/gym/                  # workout state machine, sync push, Garmin link (pure + tested)
+  app/log/                  # Log a run manually (linked from /gym)
   app/goal/                 # Goal Overview (active goal, new goal, history)
   components/               # bottom nav + page shell, status chip, shared classes
 ```

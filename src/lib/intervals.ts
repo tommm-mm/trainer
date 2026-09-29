@@ -26,11 +26,25 @@ export type IntervalsActivity = {
 export type SyncedActivity = Omit<TablesInsert<"activities">, "user_id">;
 
 const RUN_TYPES = /^(run|trailrun|virtualrun|treadmill.*|track.*)$/i;
-const GYM_TYPES = /^(weighttraining|workout|crossfit|hiit)$/i;
+const GYM_TYPES = /^weighttraining$/i;
+// Garmin "Cardio" / HIIT finishers: real load, but not a strength session.
+const CARDIO_TYPES = /^(workout|crossfit|hiit)$/i;
+// Some Garmin strength sessions arrive as a generic "Workout"; the Garmin
+// name ("Pesi" on an Italian watch) gives them away.
+const STRENGTH_NAME = /\b(pesi|strength|forza|weights?)\b/i;
+
+export type ActivityKind = "run" | "gym" | "cardio";
+
+export function classifyActivity(type: string, name: string | null | undefined): ActivityKind | null {
+  if (RUN_TYPES.test(type)) return "run";
+  if (GYM_TYPES.test(type)) return "gym";
+  if (CARDIO_TYPES.test(type)) return STRENGTH_NAME.test(name ?? "") ? "gym" : "cardio";
+  return null;
+}
 
 export function mapActivity(raw: IntervalsActivity): SyncedActivity | null {
   const type = raw.type ?? "";
-  const kind = RUN_TYPES.test(type) ? "run" : GYM_TYPES.test(type) ? "gym" : null;
+  const kind = classifyActivity(type, raw.name);
   if (!kind || raw.id === undefined || !raw.start_date_local) return null;
 
   const seconds = raw.moving_time || raw.elapsed_time || null;
@@ -41,6 +55,7 @@ export function mapActivity(raw: IntervalsActivity): SyncedActivity | null {
     external_id: String(raw.id),
     source: "garmin",
     type: kind,
+    sport_type: type || null,
     name: raw.name ?? null,
     date: raw.start_date_local.slice(0, 10),
     distance_km: distanceKm,
