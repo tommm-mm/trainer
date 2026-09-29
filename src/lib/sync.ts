@@ -8,6 +8,7 @@ import type { DB } from "@/lib/queries";
 import { addDays, todayISO } from "@/lib/dates";
 import { sessionKind } from "@/lib/sessions";
 import { fetchActivities, mapActivity } from "@/lib/intervals";
+import { linkWorkouts } from "@/lib/gym/link";
 
 const FIRST_SYNC_DAYS = 30;
 const OVERLAP_DAYS = 3;
@@ -19,6 +20,7 @@ export type SyncResult = {
   imported: number;
   updated: number;
   completedPlans: number;
+  linkedWorkouts: number;
 };
 
 /** How far back the one-time history import reaches (12 weeks + ACWR warm-up). */
@@ -59,6 +61,7 @@ export async function syncGarmin(
     imported: 0,
     updated: 0,
     completedPlans: 0,
+    linkedWorkouts: 0,
   };
   if (rows.length === 0) return result;
 
@@ -118,6 +121,9 @@ export async function syncGarmin(
       .eq("garmin_confirmed", false);
     if (error) throw error;
   }
+
+  // Logged gym workouts ↔ the Garmin session (duration, HR, session RPE).
+  result.linkedWorkouts = await linkWorkouts(supabase, { from, to });
 
   return result;
 }
