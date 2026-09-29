@@ -2,10 +2,9 @@
 
 import {
   Bar,
-  BarChart,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
@@ -14,17 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { formatValue, type ValueFormat } from "./format";
-
-// Dark-surface chart tokens (validated categorical steps for dark mode).
-export const COLORS = {
-  run: "#3987e5", // series 1 – blue
-  gym: "#d95926", // series 2 – orange
-  muted: "#525250", // de-emphasised bars (not enough data)
-  band: "#0ca30c", // "good" status – safe zones only
-  warn: "#fab219", // "warning" status – thresholds only
-  grid: "#2c2c2a",
-  axis: "#898781",
-} as const;
+import { COLORS, STATUS_COLOR } from "./theme";
 
 export type Series = {
   key: string;
@@ -33,16 +22,15 @@ export type Series = {
   stackId?: string;
 };
 
-export type Guides = {
-  /** Shaded horizontal band, e.g. the 0.8–1.3 ACWR sweet spot. */
-  band?: { from: number; to: number; label: string };
-  /** Horizontal threshold line, e.g. monotony 2.0. */
-  line?: { y: number; label: string };
-};
+type ZoneStatus = "good" | "watch" | "off";
+
+export type Zone = { from: number; to: number; status: ZoneStatus; label?: string };
+export type Threshold = { y: number; status: ZoneStatus; label: string };
 
 type Row = Record<string, string | number | null>;
 
-const HEIGHT = 190;
+const HEIGHT = 200;
+const SURFACE = "#171717";
 
 const axisProps = {
   tick: { fill: COLORS.axis, fontSize: 11 },
@@ -50,95 +38,122 @@ const axisProps = {
   axisLine: { stroke: COLORS.grid },
 } as const;
 
-function guides(g: Guides | undefined) {
-  return (
-    <>
-      {g?.band && (
-        <ReferenceArea
-          y1={g.band.from}
-          y2={g.band.to}
-          fill={COLORS.band}
-          fillOpacity={0.14}
-          stroke="none"
-          ifOverflow="extendDomain"
-          label={{ value: g.band.label, position: "insideTopRight", fill: COLORS.band, fontSize: 10 }}
-        />
-      )}
-      {g?.line && (
-        <ReferenceLine
-          y={g.line.y}
-          stroke={COLORS.warn}
-          strokeWidth={1}
-          ifOverflow="extendDomain"
-          label={{ value: g.line.label, position: "insideTopRight", fill: COLORS.warn, fontSize: 10 }}
-        />
-      )}
-    </>
-  );
-}
-
-function tooltip(format: ValueFormat) {
-  return (
-    <Tooltip
-      cursor={{ fill: "rgba(255,255,255,0.05)", stroke: COLORS.axis }}
-      contentStyle={{
-        background: "#171717",
-        border: "1px solid #262626",
-        borderRadius: 8,
-        fontSize: 12,
-      }}
-      labelStyle={{ color: "#e5e5e5", marginBottom: 2 }}
-      itemStyle={{ padding: 0 }}
-      formatter={(value, name) =>
-        value === null || value === undefined
-          ? ["–", name]
-          : [formatValue(Number(value), format), name]
-      }
-    />
-  );
-}
-
-function Legend({ series }: { series: Series[] }) {
-  if (series.length < 2) return null;
-  return (
-    <div className="mb-1 flex gap-3 text-[11px] text-neutral-400">
-      {series.map((s) => (
-        <span key={s.key} className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: s.color }} />
-          {s.name}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-export function BarsChart({
+/**
+ * One chart for every Stats card: optional bars (stackable), optional lines,
+ * an optional trend overlay, shaded status zones and threshold lines.
+ */
+export function StatChart({
   data,
-  series,
+  bars = [],
+  lines = [],
+  trend,
   format,
-  guides: g,
-  legend = series,
+  zones = [],
+  thresholds = [],
+  domain,
+  ticks,
+  reversed = false,
 }: {
   data: Row[];
-  series: Series[];
+  bars?: Series[];
+  lines?: Series[];
+  /** Key in `data` holding the trend values (drawn dashed, neutral colour). */
+  trend?: { key: string; name: string };
   format: ValueFormat;
-  guides?: Guides;
-  /** Legend entries (defaults to all series; hide helper series by overriding). */
-  legend?: Series[];
+  zones?: Zone[];
+  thresholds?: Threshold[];
+  domain?: [number, number];
+  /** Explicit y ticks (round numbers instead of Recharts' auto ticks). */
+  ticks?: number[];
+  /** For pace: faster (smaller) values plotted higher. */
+  reversed?: boolean;
 }) {
+  const legend = [
+    ...bars.map((s) => ({ name: s.name, color: s.color, dashed: false })),
+    ...lines.map((s) => ({ name: s.name, color: s.color, dashed: false })),
+    ...(trend ? [{ name: trend.name, color: COLORS.trend, dashed: true }] : []),
+  ];
+
   return (
     <div>
-      <Legend series={legend} />
+      {legend.length > 1 && (
+        <div className="mb-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-neutral-300">
+          {legend.map((l) => (
+            <span key={l.name} className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-3"
+                style={
+                  l.dashed
+                    ? { borderTop: `2px dashed ${l.color}` }
+                    : { height: 8, borderRadius: 2, background: l.color }
+                }
+              />
+              {l.name}
+            </span>
+          ))}
+        </div>
+      )}
       <ResponsiveContainer width="100%" height={HEIGHT}>
-        <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -12 }} barCategoryGap="22%">
+        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -4 }} barCategoryGap="20%">
           <CartesianGrid vertical={false} stroke={COLORS.grid} />
-          <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={12} />
-          <YAxis {...axisProps} width={44} tickFormatter={(v: number) => formatValue(v, format, true)} />
-          {guides(g)}
-          {tooltip(format)}
-          {series.map((s, i) => {
-            // Round only the top of the stack (last series in a stack).
-            const top = !s.stackId || !series.slice(i + 1).some((o) => o.stackId === s.stackId);
+          <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={14} />
+          <YAxis
+            {...axisProps}
+            width={46}
+            domain={domain ?? ["auto", "auto"]}
+            ticks={ticks}
+            reversed={reversed}
+            tickFormatter={(v: number) => formatValue(v, format, true)}
+          />
+
+          {zones.map((z) => (
+            <ReferenceArea
+              key={`${z.from}-${z.to}`}
+              y1={z.from}
+              y2={z.to}
+              fill={STATUS_COLOR[z.status]}
+              fillOpacity={0.12}
+              stroke="none"
+              ifOverflow="hidden"
+              label={
+                z.label
+                  ? { value: z.label, position: "insideTopRight", fill: STATUS_COLOR[z.status], fontSize: 10 }
+                  : undefined
+              }
+            />
+          ))}
+          {thresholds.map((t) => (
+            <ReferenceLine
+              key={t.y}
+              y={t.y}
+              stroke={STATUS_COLOR[t.status]}
+              strokeWidth={1}
+              ifOverflow="extendDomain"
+              label={{ value: t.label, position: "insideTopRight", fill: STATUS_COLOR[t.status], fontSize: 10 }}
+            />
+          ))}
+
+          <Tooltip
+            cursor={{ fill: "rgba(255,255,255,0.06)", stroke: COLORS.axis, strokeWidth: 1 }}
+            contentStyle={{
+              background: SURFACE,
+              border: "1px solid #404040",
+              borderRadius: 8,
+              fontSize: 12,
+              color: "#e5e5e5",
+            }}
+            labelStyle={{ color: "#fafafa", fontWeight: 600, marginBottom: 2 }}
+            itemStyle={{ color: "#e5e5e5", padding: 0 }}
+            formatter={(value, name) =>
+              value === null || value === undefined
+                ? ["–", name]
+                : [formatValue(Number(value), format), name]
+            }
+          />
+
+          {bars.map((s, i) => {
+            // Round only the top segment of a stack.
+            const top = !s.stackId || !bars.slice(i + 1).some((o) => o.stackId === s.stackId);
             return (
               <Bar
                 key={s.key}
@@ -147,54 +162,13 @@ export function BarsChart({
                 fill={s.color}
                 stackId={s.stackId}
                 radius={top ? [4, 4, 0, 0] : 0}
-                stroke="#171717"
+                stroke={SURFACE}
                 strokeWidth={s.stackId ? 1 : 0}
                 isAnimationActive={false}
               />
             );
           })}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-export function LinesChart({
-  data,
-  series,
-  format,
-  guides: g,
-  domain,
-  reversed = false,
-  dots = true,
-}: {
-  data: Row[];
-  series: Series[];
-  format: ValueFormat;
-  guides?: Guides;
-  domain?: [number, number];
-  /** For pace: faster (smaller) values plotted higher. */
-  reversed?: boolean;
-  dots?: boolean;
-}) {
-  return (
-    <div>
-      <Legend series={series} />
-      <ResponsiveContainer width="100%" height={HEIGHT}>
-        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
-          <CartesianGrid vertical={false} stroke={COLORS.grid} />
-          <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={16} />
-          <YAxis
-            {...axisProps}
-            width={44}
-            domain={domain ?? ["auto", "auto"]}
-            reversed={reversed}
-            allowDecimals
-            tickFormatter={(v: number) => formatValue(v, format, true)}
-          />
-          {guides(g)}
-          {tooltip(format)}
-          {series.map((s) => (
+          {lines.map((s) => (
             <Line
               key={s.key}
               type="monotone"
@@ -202,13 +176,28 @@ export function LinesChart({
               name={s.name}
               stroke={s.color}
               strokeWidth={2}
-              dot={dots ? { r: 3, fill: s.color, stroke: "#171717", strokeWidth: 2 } : false}
-              activeDot={{ r: 5, stroke: "#171717", strokeWidth: 2 }}
+              dot={{ r: 3, fill: s.color, stroke: SURFACE, strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: s.color, stroke: SURFACE, strokeWidth: 2 }}
               connectNulls
               isAnimationActive={false}
             />
           ))}
-        </LineChart>
+          {trend && (
+            <Line
+              type="linear"
+              dataKey={trend.key}
+              name={trend.name}
+              stroke={COLORS.trend}
+              strokeOpacity={0.85}
+              strokeWidth={1.5}
+              strokeDasharray="5 4"
+              dot={false}
+              activeDot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+          )}
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

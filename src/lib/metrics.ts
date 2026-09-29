@@ -334,11 +334,22 @@ export function efficiencyFactor(distanceKm: number, durationMin: number, avgHr:
 }
 
 /**
- * Pace (sec/km) you'd run at `hr` given an efficiency factor, assuming speed
- * scales with HR — a readable translation of EF, not a prediction.
+ * Pace (sec/km) you'd run at `refHr`, assuming speed scales with heart-rate
+ * *reserve* (HR above resting), not raw HR: scaling by raw HR ignores the
+ * resting offset and makes slower runs look falsely inefficient.
+ * A readable normalisation for trends, not a race prediction.
  */
-export function paceAtHr(ef: number, hr: number): number {
-  return 1000 / (ef * hr) * 60;
+export function paceAtHr(
+  distanceKm: number,
+  durationMin: number,
+  avgHr: number,
+  refHr: number,
+  restHr: number,
+): number | null {
+  if (avgHr <= restHr || refHr <= restHr) return null;
+  const speed = (distanceKm * 1000) / durationMin; // m/min
+  const speedAtRef = (speed * (refHr - restHr)) / (avgHr - restHr);
+  return (1000 / speedAtRef) * 60;
 }
 
 export type AerobicWeek = {
@@ -369,13 +380,17 @@ export function weeklyAerobic(
     }
     const w = (f: (r: ActivityInput) => number) =>
       sum(runs.map((r) => f(r) * r.duration_min!)) / minutes;
-    const ef = w((r) => efficiencyFactor(r.distance_km!, r.duration_min!, r.avg_hr!));
+    // Duration-weighted mean speed at the reference HR, turned back into pace.
+    const speedAtRef = w((r) => {
+      const pace = paceAtHr(r.distance_km!, r.duration_min!, r.avg_hr!, refHr, anchors.rest);
+      return pace === null ? 0 : 60_000 / pace;
+    });
     return {
       week,
       easyRuns: runs.length,
       avgHr: w((r) => r.avg_hr!),
-      ef,
-      paceAtRefHr: paceAtHr(ef, refHr),
+      ef: w((r) => efficiencyFactor(r.distance_km!, r.duration_min!, r.avg_hr!)),
+      paceAtRefHr: speedAtRef > 0 ? 60_000 / speedAtRef : null,
     };
   });
 }
@@ -418,6 +433,55 @@ export function trainingSummary(
     weekKm: week.km,
     estimatedLoadShare: estimatedLoadShare(sessions.filter((s) => s.date >= from && s.date <= today)),
   };
+}
+
+// ---------------------------------------------------------------- trends
+
+/**
+ * Trailing moving average. Nulls are skipped; a point needs at least half the
+ * window filled, otherwise it's null (no trend from one lonely value).
+ */
+export function rollingMean(values: (number | null)[], window: number): (number | null)[] {
+  return values.map((_, i) => {
+    const slice = values
+      .slice(Math.max(0, i - window + 1), i + 1)
+      .filter((v): v is number => v !== null);
+    return slice.length >= Math.ceil(window / 2) ? sum(slice) / slice.length : null;
+  });
+}
+
+export type LinearFit = {
+  /** Change per step (per week for weekly series). */
+  slope: number;
+  intercept: number;
+  /** Fitted value at every index (so the line spans the whole chart). */
+  fitted: number[];
+  points: number;
+};
+
+/** Least-squares straight line through the non-null points; null with < 3 points. */
+export function linearFit(values: (number | null)[]): LinearFit | null {
+  const pts = values
+    .map((y, x) => ({ x, y }))
+    .filter((p): p is { x: number; y: number } => p.y !== null);
+  if (pts.length < 3) return null;
+  const mx = sum(pts.map((p) => p.x)) / pts.length;
+  const my = sum(pts.map((p) => p.y)) / pts.length;
+  const sxx = sum(pts.map((p) => (p.x - mx) ** 2));
+  if (sxx === 0) return null;
+  const slope = sum(pts.map((p) => (p.x - mx) * (p.y - my))) / sxx;
+  const intercept = my - slope * mx;
+  return {
+    slope,
+    intercept,
+    fitted: values.map((_, x) => intercept + slope * x),
+    points: pts.length,
+  };
+}
+
+/** True when `week` (a Monday) is fully in the past as of `today`. */
+export function isCompleteWeek(week: string, today: string): boolean {
+  return addDays(week, 6) < today;
 }
 
 // ---------------------------------------------------------------- helpers

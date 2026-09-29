@@ -243,7 +243,10 @@ describe("aerobic trend (easy runs)", () => {
     // 10 km in 60 min = 166.67 m/min at 150 bpm → EF 1.111
     const ef = efficiencyFactor(10, 60, 150);
     expect(ef).toBeCloseTo(1.1111, 3);
-    expect(paceAtHr(ef, 150)).toBeCloseTo(360); // 6:00/km back at the same HR
+    expect(paceAtHr(10, 60, 150, 150, 50)).toBeCloseTo(360); // same HR → same 6:00/km
+    // Half the heart-rate reserve (50 of 100 beats above rest) → half the speed → 12:00/km.
+    expect(paceAtHr(10, 60, 150, 100, 50)).toBeCloseTo(720);
+    expect(paceAtHr(10, 60, 45, 100, 50)).toBeNull(); // HR below resting: no estimate
     expect(referenceHr(anchors)).toBe(148); // 50 + 0.65 × 150 = 147.5 → 148
   });
 
@@ -258,7 +261,9 @@ describe("aerobic trend (easy runs)", () => {
     expect(week.avgHr).toBeCloseTo((150 * 60 + 120 * 30) / 90);
     const ef = (efficiencyFactor(10, 60, 150) * 60 + efficiencyFactor(4, 30, 120) * 30) / 90;
     expect(week.ef).toBeCloseTo(ef);
-    expect(week.paceAtRefHr).toBeCloseTo(paceAtHr(ef, 148));
+    // At ref 148 (98 beats above rest): run 1 166.67 × 98/100 = 163.33 m/min,
+    // run 2 133.33 × 98/70 = 186.67 m/min; weighted (×60, ×30) = 171.11 m/min → 350.6 s/km.
+    expect(week.paceAtRefHr).toBeCloseTo(60_000 / ((163.3333 * 60 + 186.6667 * 30) / 90), 1);
   });
 });
 
