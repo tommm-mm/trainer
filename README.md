@@ -12,10 +12,14 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | A | London region, Garmin sync via intervals.icu, auto-tick plans, post-workout feedback | ✅ |
 | B | Check-in + Analytics (volume, long-run share, ACWR, monotony, HR trend) | ✅ |
 | G | Gym logger, template editor, gym Stats, Today card, live meters, auto-refresh | ✅ |
-| C | Stub `/api/generate-week` + "Generate my week" | ⏳ |
-| D | Real Claude call + goal-type branching + flags | ⏳ |
-| E | Scheduled AI draft (Vercel Cron, 2x/week) | ⏳ |
-| F | PWA install on phone | ⏳ |
+| C1 | Season model for any goal: goal → macrocycle → mesocycles (blocks, deloads, focus), approval flow | ⏳ next |
+| C2 | Rules engine (pure, tested): run progression (≤10%/wk, long run 30–35%, 80/20), gym progression (double progression at RIR, sets/muscle per block), spacing & safety guards | ⏳ |
+| D0 | Coach inbox: one contract any coach writes to (proposed plans + targets + rationale), validated by C2 rules, approved in the app | ⏳ |
+| D1 | AI planner (Claude API): season, blocks and weekly plan with reasons; Regenerate with a reason | ⏳ |
+| D2 | Flexible week (sessions by priority, reshuffle when life happens) + weekly coach review with memory | ⏳ |
+| E | Automatic Sunday plan (Vercel Cron) | ⏳ |
+| F | PWA install + offline shell + "your week is ready" notification | ⏳ |
+| Later | "Ask coach" chat in the app; next season after Padova | ⏳ |
 
 ## Garmin sync
 
