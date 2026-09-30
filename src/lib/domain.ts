@@ -44,7 +44,14 @@ export function isOneOf<T extends string>(
 
 // ---- goal params (goals.params jsonb), one shape per goal_type ----
 
-export type TuneUpRace = { name: string; date: string };
+/** A = the goal race (full taper), B = important (3–4 easy days before), C = by feel. */
+export type RacePriority = "A" | "B" | "C";
+export type TuneUpRace = {
+  name: string;
+  date: string;
+  priority?: RacePriority;
+  distance_km?: number;
+};
 
 export type RaceParams = {
   race_name?: string;

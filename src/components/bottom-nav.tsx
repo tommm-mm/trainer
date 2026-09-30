@@ -7,7 +7,7 @@ const TABS = [
   { href: "/", label: "Week", enabled: true },
   { href: "/gym", label: "Gym", enabled: true },
   { href: "/checkin", label: "Check-in", enabled: true },
-  { href: "/goal", label: "Goal", enabled: true },
+  { href: "/season", label: "Season", enabled: true },
   { href: "/analytics", label: "Stats", enabled: true },
 ];
 

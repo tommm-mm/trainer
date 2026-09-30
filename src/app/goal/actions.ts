@@ -9,7 +9,6 @@ import {
   GOAL_STATUSES,
   GOAL_TYPES,
   PADOVA_SEED,
-  PHASES,
   isOneOf,
   type TuneUpRace,
 } from "@/lib/domain";
@@ -57,37 +56,6 @@ export async function setGoalStatus(id: string, status: string): Promise<ActionS
     const { error } = await supabase
       .from("goals")
       .update({ status, updated_at: new Date().toISOString() })
-      .eq("id", id);
-    if (error) throw error;
-  } catch (err) {
-    return toErrorState(err);
-  }
-  revalidatePath("/", "layout");
-  return { error: null, ok: true };
-}
-
-/** Manual override of the race periodization state (the AI will manage it later). */
-export async function updateRaceProgress(
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  try {
-    const id = requiredText(form, "id", "Goal");
-    const phase = text(form, "phase");
-    if (phase && !isOneOf(PHASES, phase)) throw new FormError("Invalid phase.");
-    const supabase = await createClient();
-    const { error } = await supabase
-      .from("goals")
-      .update({
-        phase,
-        build_week_number: num(form, "build_week_number", "Build week", {
-          min: 0,
-          max: 60,
-          int: true,
-        }),
-        deload_week: form.get("deload_week") === "on",
-        updated_at: new Date().toISOString(),
-      })
       .eq("id", id);
     if (error) throw error;
   } catch (err) {

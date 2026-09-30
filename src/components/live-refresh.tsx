@@ -10,7 +10,14 @@ import { createClient } from "@/lib/supabase/client";
 // when you come back to the app after a while. Realtime applies RLS, so only
 // your own rows trigger it.
 
-const TABLES = ["activities", "weekly_plans", "exercise_targets", "checkins"] as const;
+const TABLES = [
+  "activities",
+  "weekly_plans",
+  "exercise_targets",
+  "checkins",
+  "seasons",
+  "season_weeks",
+] as const;
 const DEBOUNCE_MS = 600;
 const STALE_AFTER_MS = 60_000;
 

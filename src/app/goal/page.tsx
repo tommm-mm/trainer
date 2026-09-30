@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageShell } from "@/components/bottom-nav";
 import { btnDanger, btnPrimary, cardCls } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
@@ -14,7 +15,7 @@ import {
   type StrengthParams,
 } from "@/lib/domain";
 import { seedPadova, setGoalStatus } from "./actions";
-import { ActionButton, NewGoalForm, RaceProgressForm } from "./goal-forms";
+import { ActionButton, NewGoalForm } from "./goal-forms";
 
 export default async function GoalPage() {
   const supabase = await createClient();
@@ -29,7 +30,7 @@ export default async function GoalPage() {
   const today = todayISO();
 
   return (
-    <PageShell active="/goal">
+    <PageShell active="/season">
       <h1 className="mb-4 text-xl font-semibold tracking-tight">Goal</h1>
 
       {error && (
@@ -184,7 +185,10 @@ function RaceDetails({ goal, today }: { goal: Tables<"goals">; today: string }) 
               const d = daysBetween(today, r.date);
               return (
                 <li key={r.name + r.date} className="flex justify-between">
-                  <span>{r.name}</span>
+                  <span>
+                    {r.name}
+                    <span className="ml-1 text-xs text-neutral-500">{r.priority ?? "B"}</span>
+                  </span>
                   <span className="text-neutral-400">
                     {formatLongDate(r.date)} · {d >= 0 ? `in ${d} d` : "done"}
                   </span>
@@ -195,20 +199,10 @@ function RaceDetails({ goal, today }: { goal: Tables<"goals">; today: string }) 
         </div>
       )}
 
-      <div>
-        <p className="mb-2 text-xs uppercase tracking-wide text-neutral-500">
-          Periodization
-          <span className="ml-1 normal-case tracking-normal text-neutral-600">
-            (manual until the AI coach manages it)
-          </span>
-        </p>
-        <RaceProgressForm
-          id={goal.id}
-          phase={goal.phase}
-          buildWeek={goal.build_week_number}
-          deload={goal.deload_week}
-        />
-      </div>
+      <Link href="/season" className="flex items-center justify-between rounded-lg bg-neutral-950/60 px-3 py-2 text-sm">
+        <span>Blocks, weekly targets and races</span>
+        <span className="text-emerald-400">Season →</span>
+      </Link>
     </>
   );
 }
