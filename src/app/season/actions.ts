@@ -104,6 +104,7 @@ export async function updateSeasonWeek(_prev: ActionState, form: FormData): Prom
         long_run_km: longRun,
         runs: num(form, "runs", "Runs", { min: 0, max: 14, int: true }),
         gym_sessions: num(form, "gym_sessions", "Gym", { min: 0, max: 14, int: true }),
+        cross_sessions: num(form, "cross_sessions", "Bike / swim", { min: 0, max: 14, int: true }),
         is_deload: form.get("is_deload") === "on",
         key_session: text(form, "key_session"),
         notes: text(form, "notes"),

@@ -275,6 +275,7 @@ export type Database = {
       season_weeks: {
         Row: {
           gym_sessions: number | null
+          cross_sessions: number | null
           id: string
           is_deload: boolean
           key_session: string | null
@@ -291,6 +292,7 @@ export type Database = {
         }
         Insert: {
           gym_sessions?: number | null
+          cross_sessions?: number | null
           id?: string
           is_deload?: boolean
           key_session?: string | null

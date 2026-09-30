@@ -44,6 +44,7 @@ function toSeason(
             runs: w.runs,
             quality_sessions: w.quality_sessions,
             gym_sessions: w.gym_sessions,
+            cross_sessions: w.cross_sessions,
             key_session: w.key_session,
             milestone: w.milestone,
             notes: w.notes,

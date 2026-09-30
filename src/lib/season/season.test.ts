@@ -182,7 +182,7 @@ describe("progress", () => {
     expect(currentPosition(blocks, "2026-09-27")).toBeNull();
   });
 
-  it("sums runs per week and counts gym days once", () => {
+  it("sums runs per week and counts gym and bike days once", () => {
     const a = weeklyActuals(
       [
         { date: "2026-09-29", type: "run", distance_km: 6.23 },
@@ -190,10 +190,13 @@ describe("progress", () => {
         { date: "2026-09-28", type: "gym", distance_km: null },
         { date: "2026-09-29", type: "gym", distance_km: null },
         { date: "2026-09-29", type: "cardio", distance_km: null },
+        { date: "2026-09-30", type: "cross", distance_km: null },
+        { date: "2026-09-30", type: "cross", distance_km: null },
+        { date: "2026-10-02", type: "cross", distance_km: null },
       ],
       ["2026-09-29", "2026-10-01"],
     );
-    expect(a.get("2026-09-28")).toEqual({ run_km: 13.2, runs: 2, long_run_km: 7, gym_sessions: 3 });
+    expect(a.get("2026-09-28")).toEqual({ run_km: 13.2, runs: 2, long_run_km: 7, gym_sessions: 3, cross_sessions: 2 });
   });
 
   it("judges a week on the ±6% band", () => {
@@ -242,12 +245,17 @@ describe("Padova 2027 draft", () => {
       end: "2027-04-18",
       weeks: 29,
       blocks: 7,
-      peakKm: 63,
+      peakKm: 60,
       peakWeek: "2027-03-15",
       longestRun: 30,
       deloads: 6,
     });
-    const runs = flattenWeeks(PADOVA_2027.blocks).map((w) => w.runs ?? 0);
-    expect(Math.max(...runs)).toBe(6);
+    const weeks = flattenWeeks(PADOVA_2027.blocks);
+    expect(Math.max(...weeks.map((w) => w.runs ?? 0))).toBe(5);
+    // Never more than 2 quality sessions; the bike is easy volume on top.
+    expect(Math.max(...weeks.map((w) => w.quality_sessions ?? 0))).toBe(2);
+    const intervals = weeks.filter((w) => /VO₂|reps|Intervals|Fartlek|Sharpener|6×1′/.test(w.key_session ?? ""));
+    expect(intervals.length).toBeGreaterThanOrEqual(9);
+    expect(weeks.some((w) => /hill/i.test(w.key_session ?? ""))).toBe(false);
   });
 });

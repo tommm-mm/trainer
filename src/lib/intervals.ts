@@ -29,16 +29,20 @@ const RUN_TYPES = /^(run|trailrun|virtualrun|treadmill.*|track.*)$/i;
 const GYM_TYPES = /^weighttraining$/i;
 // Garmin "Cardio" / HIIT finishers: real load, but not a strength session.
 const CARDIO_TYPES = /^(workout|crossfit|hiit)$/i;
+// Cross-training: easy aerobic time without running impact (exercise bike,
+// swimming). Counts in load, never in run km.
+const CROSS_TYPES = /^(ride|virtualride|ebikeride|mountainbikeride|gravelride|swim|openwaterswim|rowing|elliptical)$/i;
 // Some Garmin strength sessions arrive as a generic "Workout"; the Garmin
 // name ("Pesi" on an Italian watch) gives them away.
 const STRENGTH_NAME = /\b(pesi|strength|forza|weights?)\b/i;
 
-export type ActivityKind = "run" | "gym" | "cardio";
+export type ActivityKind = "run" | "gym" | "cardio" | "cross";
 
 export function classifyActivity(type: string, name: string | null | undefined): ActivityKind | null {
   if (RUN_TYPES.test(type)) return "run";
   if (GYM_TYPES.test(type)) return "gym";
   if (CARDIO_TYPES.test(type)) return STRENGTH_NAME.test(name ?? "") ? "gym" : "cardio";
+  if (CROSS_TYPES.test(type)) return "cross";
   return null;
 }
 

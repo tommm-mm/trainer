@@ -2,12 +2,13 @@
 // plans the week. Pure: the Week View passes in what it loaded.
 
 import { addDays, daysBetween, mondayOf } from "@/lib/dates";
+import type { SessionKind } from "@/lib/sessions";
 
 export type TodayInput = {
   today: string;
   inProgress: boolean;
   /** Plans for today that aren't completed yet. */
-  plannedToday: { id: string; label: string; kind: "run" | "gym" | "other"; templateId: string | null }[];
+  plannedToday: { id: string; label: string; kind: SessionKind; templateId: string | null }[];
   gymDoneToday: boolean;
   runDoneToday: boolean;
   /** Dates of completed gym workouts this week. */
@@ -20,7 +21,7 @@ export type TodayInput = {
 
 export type TodayAction =
   | { kind: "resume" }
-  | { kind: "plan"; planId: string; label: string; planKind: "run" | "gym" | "other"; templateId: string | null }
+  | { kind: "plan"; planId: string; label: string; planKind: SessionKind; templateId: string | null }
   | { kind: "gym"; templateId: string; templateName: string; reason: string }
   | { kind: "run-or-rest"; reason: string }
   | { kind: "done"; reason: string };

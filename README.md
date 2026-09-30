@@ -15,7 +15,7 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | C1 | Season model: goal → season → blocks → weekly targets, versioned proposals, guardrails, Season page | 🔍 review |
 | W | Garmin wellness sync (VO₂max, HRV, resting HR, sleep, CTL/ATL) → Stats › Fitness | ⏳ |
 | C2 | Week generator: season targets + days you can train → proposed sessions | ⏳ |
-| D0 | Coach inbox: Cowork / Claude API write proposals through the season contract | ⏳ |
+| D0 | Coach inbox: Cowork / Claude API write proposals through the season contract | 🟡 via SQL + brief; dedicated inbox ⏳ |
 | C | Stub `/api/generate-week` + "Generate my week" | ⏳ → C2 |
 | D | Real Claude call + goal-type branching + flags | ⏳ |
 | E | Scheduled AI draft (Vercel Cron, 2x/week) | ⏳ |
@@ -27,7 +27,7 @@ Garmin Connect → intervals.icu (their side) → `POST /api/sync` → `activiti
 
 - Runs automatically when the Week View opens (at most every 10 min) and on the "↻ Garmin" button.
 - Window: last 30 days on first sync, then from the latest synced day − 3 days. Idempotent (unique `user_id, external_id`).
-- Runs / trail / virtual / treadmill → `run`; `WeightTraining` → `gym`; `Workout` / `HIIT` / `Crossfit` → `cardio` (HIIT finishers: count in load, not as gym sessions) unless the Garmin name says strength ("Pesi"). The raw type is kept in `activities.sport_type`. Other sports are skipped.
+- Runs / trail / virtual / treadmill → `run`; `WeightTraining` → `gym`; `Workout` / `HIIT` / `Crossfit` → `cardio` (HIIT finishers: count in load, not as gym sessions) unless the Garmin name says strength ("Pesi"); rides (incl. indoor / exercise bike), swims, rowing, elliptical → `cross` (easy aerobic time: counts in load with an HR-based RPE, never in run km). The raw type is kept in `activities.sport_type`. Other sports are skipped.
 - Same-day `approved`/`edited` plan of the same kind → `completed`. `proposed` plans are never touched.
 - Same-day manual gym logs → `garmin_confirmed = true`.
 - Completed gym workouts → linked to the longest same-day `gym` activity (`workouts.activity_id`); the session RPE is copied onto it.
@@ -123,6 +123,8 @@ Race weeks (goal and tune-ups) skip ramp, share and cap checks.
 - **Efforts.** HR bands as % of heart-rate reserve on your Garmin anchors (recovery < 65%, easy 65–75%, MP 75–84%, threshold 84–90%, intervals 90–97%); paces offset from goal marathon pace (Daniels VDOT tables). Tests in the plan replace the pace targets.
 - **Races.** The goal race is A; tune-ups live in `goals.params.tune_up_races` with priority B/C and distance, added from the Season page. Tests inside the plan (time trials) are week `milestone`s.
 - **Week View** shows the approved season's targets for the week with progress meters.
+- **Cross-training.** Weeks carry `cross_sessions` (easy bike / swim for recovery); Garmin rides and swims sync as `cross` and fill that meter. They add load, never run km.
+- **Weekly coaching loop.** The Cowork PT follows `docs/coach/pt-brief.md`: once a week it reads the data through the Supabase connector, reviews the week, and writes next week as `proposed` `weekly_plans` rows (and, when the plan itself should change, a season proposal via `create_season_proposal`, which takes the owner from the goal so a service-role writer works). Tommaso approves both in the app.
 
 ## How the screens use the data
 

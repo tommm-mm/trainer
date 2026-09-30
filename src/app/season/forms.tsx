@@ -9,7 +9,7 @@ import { addRace, updateSeasonWeek } from "./actions";
 export function WeekEditForm({ id, week }: { id: string; week: WeekTargets }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(updateSeasonWeek, { error: null });
   return (
-    <form action={action} className="mt-2 grid grid-cols-4 gap-2">
+    <form action={action} className="mt-2 grid grid-cols-5 gap-2">
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="week_start" value={week.week_start} />
       <label className={labelCls}>
@@ -28,22 +28,26 @@ export function WeekEditForm({ id, week }: { id: string; week: WeekTargets }) {
         Gym
         <input name="gym_sessions" inputMode="numeric" defaultValue={week.gym_sessions ?? ""} className={inputCls} />
       </label>
-      <label className={`${labelCls} col-span-4`}>
+      <label className={labelCls}>
+        Bike
+        <input name="cross_sessions" inputMode="numeric" defaultValue={week.cross_sessions ?? ""} className={inputCls} />
+      </label>
+      <label className={`${labelCls} col-span-5`}>
         Key session
         <input name="key_session" defaultValue={week.key_session ?? ""} className={inputCls} />
       </label>
-      <label className={`${labelCls} col-span-4`}>
+      <label className={`${labelCls} col-span-5`}>
         Notes
         <input name="notes" defaultValue={week.notes ?? ""} className={inputCls} />
       </label>
-      <label className="col-span-2 flex items-center gap-2 text-xs text-neutral-300">
+      <label className="col-span-3 flex items-center gap-2 text-xs text-neutral-300">
         <input type="checkbox" name="is_deload" defaultChecked={!!week.is_deload} className="h-4 w-4" />
         Lighter week
       </label>
       <button disabled={pending} className={`${btnSmall} col-span-2 justify-self-end`}>
         {pending ? "Saving…" : state.ok ? "Saved ✓" : "Save week"}
       </button>
-      {state.error && <p className="col-span-4 text-xs text-red-400">{state.error}</p>}
+      {state.error && <p className="col-span-5 text-xs text-red-400">{state.error}</p>}
     </form>
   );
 }

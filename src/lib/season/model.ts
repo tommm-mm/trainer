@@ -72,6 +72,8 @@ export type WeekTargets = {
   runs?: number | null;
   quality_sessions?: number | null;
   gym_sessions?: number | null;
+  /** Easy bike / swim sessions (recovery, time on the legs without impact). */
+  cross_sessions?: number | null;
   key_session?: string | null;
   milestone?: string | null;
   notes?: string | null;
@@ -240,6 +242,7 @@ const RANGES: [keyof WeekTargets, number, number][] = [
   ["runs", 0, 14],
   ["quality_sessions", 0, 7],
   ["gym_sessions", 0, 14],
+  ["cross_sessions", 0, 14],
 ];
 
 export function validateSeasonDraft(draft: SeasonDraft, ctx: ValidationContext = {}): ValidationResult {
@@ -301,6 +304,7 @@ const DIFF_FIELDS = [
   "runs",
   "quality_sessions",
   "gym_sessions",
+  "cross_sessions",
   "is_deload",
   "key_session",
   "milestone",

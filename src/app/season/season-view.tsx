@@ -502,7 +502,8 @@ function EffortsCard({
       <p className="mt-2 text-xs text-neutral-500">
         HR bands are % of heart-rate reserve on rest {anchors.rest} ({anchors.restSource}) and max {anchors.max} (
         {anchors.maxSource}). Paces are the targets at goal fitness: until the tests reset them, run easy days by HR,
-        not pace.
+        not pace. Intervals: run by effort, HR lags on short repeats. Bike / swim: easy only (RPE 3–4 of 10); on the
+        bike HR sits about 5–10 bpm lower than running at the same effort.
       </p>
     </details>
   );
@@ -563,6 +564,7 @@ function BlockCard({
                   </span>
                   <span className="text-xs tabular-nums text-neutral-500">
                     L {formatNumber(w.long_run_km ?? null)} · {w.runs ?? "–"} runs · {w.gym_sessions ?? "–"} gym
+                    {w.cross_sessions ? ` · ${w.cross_sessions} bike` : ""}
                   </span>
                 </div>
                 {w.key_session && <p className="ml-16 text-xs text-neutral-400">{w.key_session}</p>}

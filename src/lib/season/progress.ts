@@ -40,12 +40,14 @@ export type WeekActual = {
   runs: number;
   long_run_km: number;
   gym_sessions: number;
+  cross_sessions: number;
 };
 
 /**
  * Done work per ISO week. Gym sessions count distinct days with a Garmin
  * strength activity or a finished logged workout (same rule as the Week View);
- * HIIT "cardio" finishers don't count.
+ * HIIT "cardio" finishers don't count. Cross-training counts distinct days
+ * with a bike / swim activity.
  */
 export function weeklyActuals(
   activities: ActivityRow[],
@@ -53,10 +55,11 @@ export function weeklyActuals(
 ): Map<string, WeekActual> {
   const out = new Map<string, WeekActual>();
   const gymDays = new Map<string, Set<string>>();
+  const crossDays = new Map<string, Set<string>>();
   const get = (week: string) => {
     let a = out.get(week);
     if (!a) {
-      a = { run_km: 0, runs: 0, long_run_km: 0, gym_sessions: 0 };
+      a = { run_km: 0, runs: 0, long_run_km: 0, gym_sessions: 0, cross_sessions: 0 };
       out.set(week, a);
     }
     return a;
@@ -78,6 +81,12 @@ export function weeklyActuals(
       w.long_run_km = Math.max(w.long_run_km, km);
     } else if (a.type === "gym") {
       addGym(a.date);
+    } else if (a.type === "cross") {
+      const week = mondayOf(a.date);
+      const days = crossDays.get(week) ?? new Set<string>();
+      days.add(a.date);
+      crossDays.set(week, days);
+      get(week).cross_sessions = days.size;
     }
   }
   for (const d of workoutDates) addGym(d);

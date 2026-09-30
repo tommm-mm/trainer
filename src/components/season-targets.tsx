@@ -16,12 +16,15 @@ export function TargetMeters({
   actual: WeekActual | undefined;
   finished: boolean;
 }) {
-  const a = actual ?? { run_km: 0, runs: 0, long_run_km: 0, gym_sessions: 0 };
+  const a = actual ?? { run_km: 0, runs: 0, long_run_km: 0, gym_sessions: 0, cross_sessions: 0 };
   const meters: Meter[] = [
     { label: "Run km", done: a.run_km, target: targets.run_km },
     { label: "Runs", done: a.runs, target: targets.runs },
     { label: "Long run", done: a.long_run_km, target: targets.long_run_km, unit: "km" },
     { label: "Gym", done: a.gym_sessions, target: targets.gym_sessions, gym: true },
+    ...(targets.cross_sessions
+      ? [{ label: "Easy bike (optional)", done: a.cross_sessions, target: targets.cross_sessions, gym: true }]
+      : []),
   ];
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-2">

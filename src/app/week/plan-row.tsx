@@ -20,6 +20,7 @@ export type PlanTemplate = TemplateOption & { exercises: string[] };
 const KIND_DOT: Record<string, string> = {
   run: "bg-emerald-400",
   gym: "bg-sky-400",
+  cross: "bg-violet-400",
   other: "bg-neutral-500",
 };
 

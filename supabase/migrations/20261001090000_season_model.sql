@@ -59,6 +59,8 @@ create table public.season_weeks (
   runs              smallint check (runs between 0 and 14),
   quality_sessions  smallint check (quality_sessions between 0 and 7),
   gym_sessions      smallint check (gym_sessions between 0 and 14),
+  -- Easy aerobic time off your feet (exercise bike, swim), for recovery.
+  cross_sessions    smallint check (cross_sessions between 0 and 14),
   key_session       text,
   -- A test or race inside the plan ("5 km time trial · Sat 31 Oct").
   milestone         text,
@@ -81,6 +83,9 @@ end $$;
 -- ============================================================ write contract
 -- The only way a coach writes a season: one JSON draft, inserted atomically as
 -- the next `proposed` version. An older open proposal is superseded.
+-- Rows take their owner from the goal, so a coach connected with the service
+-- role (Cowork via the Supabase connector) writes the same proposal the app
+-- would; from the app, RLS only lets you see (and so propose for) your goals.
 -- Draft: { title, source, rationale?, limits?, blocks: [{ name, focus,
 --   gym_focus?, purpose?, key_sessions?, weeks: [{ week_start, is_deload?,
 --   run_km?, long_run_km?, runs?, quality_sessions?, gym_sessions?,
@@ -95,6 +100,7 @@ as $$
 declare
   v_season uuid;
   v_block uuid;
+  v_user uuid;
   v_version smallint;
   v_approved uuid;
   b jsonb;
@@ -102,7 +108,7 @@ declare
   b_pos int;
 begin
   -- Serialize writers for this goal (RLS: only your own goal is visible).
-  perform 1 from public.goals where id = p_goal_id for update;
+  select user_id into v_user from public.goals where id = p_goal_id for update;
   if not found then raise exception 'Goal not found'; end if;
   if jsonb_array_length(coalesce(p_draft->'blocks', '[]'::jsonb)) = 0 then
     raise exception 'A season needs at least one block';
@@ -114,8 +120,8 @@ begin
   update public.seasons set status = 'superseded', decided_at = now()
    where goal_id = p_goal_id and status = 'proposed';
 
-  insert into public.seasons (goal_id, version, status, source, title, rationale, limits, supersedes_id)
-  values (p_goal_id, v_version, 'proposed',
+  insert into public.seasons (user_id, goal_id, version, status, source, title, rationale, limits, supersedes_id)
+  values (v_user, p_goal_id, v_version, 'proposed',
           coalesce(p_draft->>'source', 'manual'),
           p_draft->>'title',
           p_draft->>'rationale',
@@ -127,18 +133,18 @@ begin
     if jsonb_array_length(coalesce(b->'weeks', '[]'::jsonb)) = 0 then
       raise exception 'Block % has no weeks', b->>'name';
     end if;
-    insert into public.mesocycles (season_id, position, name, focus, gym_focus, purpose, key_sessions)
-    values (v_season, b_pos, b->>'name', b->>'focus', b->>'gym_focus', b->>'purpose', b->>'key_sessions')
+    insert into public.mesocycles (user_id, season_id, position, name, focus, gym_focus, purpose, key_sessions)
+    values (v_user, v_season, b_pos, b->>'name', b->>'focus', b->>'gym_focus', b->>'purpose', b->>'key_sessions')
     returning id into v_block;
 
     for w in select value from jsonb_array_elements(b->'weeks') loop
-      insert into public.season_weeks (season_id, mesocycle_id, week_start, is_deload, run_km,
-        long_run_km, runs, quality_sessions, gym_sessions, key_session, milestone, notes)
-      values (v_season, v_block, (w->>'week_start')::date,
+      insert into public.season_weeks (user_id, season_id, mesocycle_id, week_start, is_deload, run_km,
+        long_run_km, runs, quality_sessions, gym_sessions, cross_sessions, key_session, milestone, notes)
+      values (v_user, v_season, v_block, (w->>'week_start')::date,
         coalesce((w->>'is_deload')::boolean, false),
         (w->>'run_km')::numeric, (w->>'long_run_km')::numeric,
         (w->>'runs')::smallint, (w->>'quality_sessions')::smallint, (w->>'gym_sessions')::smallint,
-        w->>'key_session', w->>'milestone', w->>'notes');
+        (w->>'cross_sessions')::smallint, w->>'key_session', w->>'milestone', w->>'notes');
     end loop;
   end loop;
 
@@ -166,3 +172,10 @@ begin
 end $$;
 
 alter publication supabase_realtime add table public.seasons, public.season_weeks;
+
+-- ============================================================ cross-training
+-- Garmin rides (incl. indoor bike) and swims were skipped by the sync; they
+-- now land as `cross`: load counts, run km doesn't.
+alter table public.activities drop constraint activities_type_check;
+alter table public.activities add constraint activities_type_check
+  check (type in ('run','gym','cardio','cross'));
