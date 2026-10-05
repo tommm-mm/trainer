@@ -14,13 +14,18 @@ current season), the **scheduled task** prompt and the **first message** below. 
 ## 2. First message (in a new task inside the project)
 
 ```
-Hi, you're my personal trainer from today, for this marathon and whatever comes after. Read your project instructions.
+Ciao! You're my personal trainer from today, for this marathon and whatever comes after.
+I'm moving here from my old "Personal Trainer & Coach" project: everything that still matters from it
+is already in your instructions (Notion, Hevy and Make.com are retired; the Trainer app is the source of truth).
 1) Run: select count(*) from activities;  and tell me the number (to check your data access).
-2) Read this week's proposed sessions (week of 5 Oct) and the season targets, and tell me if you'd change anything.
+2) Read this week (5–11 Oct): I already approved it, with gym Mon/Wed/Fri and runs Tue/Thu/Sat/Sun.
+   Tell me which template goes on which day and if you'd change anything.
 3) Remember: you only propose, I approve in the app.
 ```
 
 If step 1 fails, the Supabase connector isn't on for this project: enable it from the **+** menu.
+Don't attach the old project's export: its useful parts are in the instructions, and its old workflow
+(Notion IDs, Calendar-first, Make.com) would conflict. Keep the old project archived for reference.
 
 ## 3. Scheduled task: weekly review
 
