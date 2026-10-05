@@ -1,6 +1,6 @@
 # Coach brief: Tommaso, Padova Marathon 2027
 
-Paste this whole file into the Cowork PT project (project instructions or first message).
+Full reference. For the Cowork project, paste `cowork-instructions.md` (shorter, self-contained) and follow `cowork-setup.md`.
 Written 30 Sep 2026 by Claude Code (builds the Trainer app) together with Tommaso. It is the
 starting point, **not** a frozen plan: once the season is in the app, the app is the source of truth.
 
@@ -192,7 +192,7 @@ select day, session_type, target_distance_km, status, notes from weekly_plans
 where week_start_date = date_trunc('week', current_date)::date + 7 order by day;
 ```
 
-(`seasons`, `mesocycles`, `season_weeks` exist once the season release is live; until then use section 4.)
+(`seasons`, `mesocycles`, `season_weeks` are live since 5 Oct 2026. The approved season is the source of truth; section 4 is the version Tommaso reviewed.)
 
 ## 9. Writing proposals (only these two, nothing else)
 
