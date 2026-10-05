@@ -118,3 +118,23 @@ describe("load guardrails", () => {
     expect(guardrails(flattenWeeks(blocks([{ week_start: "2026-10-05", load_target: 9000 }])))).toEqual([]);
   });
 });
+
+describe("athleteFromRow", () => {
+  it("parses anchors, threshold and calibration with defaults for bad keys", async () => {
+    const { athleteFromRow } = await import("./athlete");
+    const a = athleteFromRow({
+      user_id: "u",
+      rest_hr: 48,
+      max_hr: 196,
+      rest_source: "garmin",
+      max_source: "weird",
+      threshold_hr: 174,
+      threshold_date: "2026-11-14",
+      load_calibration: { easy_rpe: 3.5, gym_min: "x", hiit_week: 48 },
+      updated_at: "2026-10-05T00:00:00Z",
+    });
+    expect(a.anchors).toEqual({ rest: 48, max: 196, restSource: "garmin", maxSource: "default", threshold: 174 });
+    expect(a.calibration).toEqual({ ...DEFAULT_CALIBRATION, easy_rpe: 3.5, hiit_week: 48 });
+    expect(a.stored).toBe(true);
+  });
+});

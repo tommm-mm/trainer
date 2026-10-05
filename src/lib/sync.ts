@@ -2,6 +2,8 @@
 // - upserts activities (idempotent on user_id + external_id)
 // - ticks same-day approved/edited plan rows of the matching kind as completed
 // - links logged gym workouts to the same-day Garmin strength activity
+// - fetches HR streams for time in zones and refreshes athlete_settings
+//   (HR anchors + planned-load calibration), best effort
 // It never approves, creates or edits plans: that stays a user action.
 
 import type { DB } from "@/lib/queries";
@@ -9,6 +11,7 @@ import { addDays, todayISO } from "@/lib/dates";
 import { sessionKind } from "@/lib/sessions";
 import { fetchActivities, mapActivity } from "@/lib/intervals";
 import { linkWorkouts } from "@/lib/gym/link";
+import { fillHrHistograms, refreshAthleteSettings } from "@/lib/athlete";
 
 const FIRST_SYNC_DAYS = 30;
 const OVERLAP_DAYS = 3;
@@ -21,6 +24,8 @@ export type SyncResult = {
   updated: number;
   completedPlans: number;
   linkedWorkouts: number;
+  /** Activities that got their HR histogram (time in zones) this run. */
+  hrStreams: number;
 };
 
 /** How far back the one-time history import reaches (12 weeks + ACWR warm-up). */
@@ -62,8 +67,12 @@ export async function syncGarmin(
     updated: 0,
     completedPlans: 0,
     linkedWorkouts: 0,
+    hrStreams: 0,
   };
-  if (rows.length === 0) return result;
+  if (rows.length === 0) {
+    await afterSync(supabase, userId, to, result);
+    return result;
+  }
 
   const { data: existing, error: exErr } = await supabase
     .from("activities")
@@ -114,5 +123,20 @@ export async function syncGarmin(
   // Logged gym workouts ↔ the Garmin session (duration, HR, session RPE).
   result.linkedWorkouts = await linkWorkouts(supabase, { from, to });
 
+  await afterSync(supabase, userId, to, result);
   return result;
+}
+
+/** Zones and settings never fail the sync: they catch up on the next one. */
+async function afterSync(supabase: DB, userId: string, today: string, result: SyncResult) {
+  try {
+    result.hrStreams = await fillHrHistograms(supabase);
+  } catch (err) {
+    console.error("[sync] HR streams skipped:", err instanceof Error ? err.message : err);
+  }
+  try {
+    await refreshAthleteSettings(supabase, userId, today);
+  } catch (err) {
+    console.error("[sync] athlete settings skipped:", err instanceof Error ? err.message : err);
+  }
 }

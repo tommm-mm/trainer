@@ -27,6 +27,8 @@ export type Database = {
           feedback_at: string | null
           feedback_notes: string | null
           feeling_score: number | null
+          hr_hist: number[] | null
+          hr_hist_min: number | null
           id: string
           max_hr: number | null
           name: string | null
@@ -48,6 +50,8 @@ export type Database = {
           feedback_at?: string | null
           feedback_notes?: string | null
           feeling_score?: number | null
+          hr_hist?: number[] | null
+          hr_hist_min?: number | null
           id?: string
           max_hr?: number | null
           name?: string | null
@@ -58,6 +62,32 @@ export type Database = {
           user_id?: string
         }
         Update: Partial<Database["public"]["Tables"]["activities"]["Insert"]>
+        Relationships: []
+      }
+      athlete_settings: {
+        Row: {
+          load_calibration: Json
+          max_hr: number
+          max_source: string
+          rest_hr: number
+          rest_source: string
+          threshold_date: string | null
+          threshold_hr: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          load_calibration?: Json
+          max_hr?: number
+          max_source?: string
+          rest_hr?: number
+          rest_source?: string
+          threshold_date?: string | null
+          threshold_hr?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["athlete_settings"]["Insert"]>
         Relationships: []
       }
       body_metrics: {
@@ -279,6 +309,7 @@ export type Database = {
           id: string
           is_deload: boolean
           key_session: string | null
+          load_target: number | null
           long_run_km: number | null
           mesocycle_id: string
           milestone: string | null
@@ -296,6 +327,7 @@ export type Database = {
           id?: string
           is_deload?: boolean
           key_session?: string | null
+          load_target?: number | null
           long_run_km?: number | null
           mesocycle_id: string
           milestone?: string | null
@@ -625,7 +657,87 @@ export type Database = {
         ]
       }
     }
-    Views: { [_ in never]: never }
+    Views: {
+      hr_zone_cuts: {
+        Row: {
+          easy_from: number
+          marathon_from: number
+          max_hr: number
+          rest_hr: number
+          threshold_date: string | null
+          threshold_from: number
+          threshold_hr: number | null
+          user_id: string
+          vo2_from: number
+        }
+        Relationships: []
+      }
+      session_loads: {
+        Row: {
+          date: string
+          id: string
+          load: number
+          load_type: string
+          minutes: number
+          name: string | null
+          rpe: number
+          rpe_source: string
+          type: string
+          user_id: string
+          week_start: string
+        }
+        Relationships: []
+      }
+      weekly_load: {
+        Row: {
+          cross_training: number
+          estimated_share: number | null
+          gym: number
+          hiit: number
+          run: number
+          total: number
+          user_id: string
+          week_start: string
+        }
+        Relationships: []
+      }
+      weekly_zones: {
+        Row: {
+          band_easy_min: number
+          band_hard_min: number
+          band_moderate_min: number
+          easy_min: number
+          easy_share: number | null
+          marathon_min: number
+          missing: number
+          recovery_min: number
+          threshold_min: number
+          user_id: string
+          vo2_min: number
+          week_start: string
+        }
+        Relationships: []
+      }
+      season_week_load: {
+        Row: {
+          cross_training: number
+          estimate: number
+          gym: number
+          hiit: number
+          is_deload: boolean
+          load_target: number | null
+          planned: number
+          planned_source: string
+          run: number
+          season_id: string
+          season_status: string
+          season_week_id: string
+          user_id: string
+          week_start: string
+        }
+        Relationships: []
+      }
+    }
     Functions: {
       approve_season: { Args: { p_season_id: string }; Returns: undefined }
       create_season_proposal: { Args: { p_goal_id: string; p_draft: Json }; Returns: string }

@@ -105,11 +105,49 @@ export async function updateSeasonWeek(_prev: ActionState, form: FormData): Prom
         runs: num(form, "runs", "Runs", { min: 0, max: 14, int: true }),
         gym_sessions: num(form, "gym_sessions", "Gym", { min: 0, max: 14, int: true }),
         cross_sessions: num(form, "cross_sessions", "Bike / swim", { min: 0, max: 14, int: true }),
+        load_target: num(form, "load_target", "Load target", { min: 0, max: 20000, int: true }),
         is_deload: form.get("is_deload") === "on",
         key_session: text(form, "key_session"),
         notes: text(form, "notes"),
       })
       .eq("id", id);
+    if (error) throw error;
+  } catch (err) {
+    return toErrorState(err);
+  }
+  return done();
+}
+
+// ---------------------------------------------------------------- threshold
+
+/**
+ * Threshold HR from a test (Efforts card). Re-centres the zones; time in
+ * zones re-bins on the next page load. Blank HR = back to the default bands.
+ */
+export async function setThresholdHr(_prev: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const hr = num(form, "threshold_hr", "Threshold HR", { min: 100, max: 230, int: true });
+    const date = text(form, "threshold_date");
+    if (date && (!isISODate(date) || date > todayISO())) throw new FormError("The test date must be a past day.");
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new FormError("Sign in first.");
+    const { data: current } = await supabase.from("athlete_settings").select("rest_hr, max_hr").maybeSingle();
+    if (hr !== null && current && (hr <= current.rest_hr || hr >= current.max_hr)) {
+      throw new FormError(`Threshold must be between rest (${current.rest_hr}) and max (${current.max_hr}).`);
+    }
+    // Upsert keeps the synced anchors; a first save before any sync uses the defaults.
+    const { error } = await supabase.from("athlete_settings").upsert(
+      {
+        user_id: user.id,
+        threshold_hr: hr,
+        threshold_date: hr === null ? null : date,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
     if (error) throw error;
   } catch (err) {
     return toErrorState(err);

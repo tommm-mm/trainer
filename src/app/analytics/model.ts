@@ -2,7 +2,7 @@
 // verdicts and the coach's read. Pure (no DB, no clock), so the page and a
 // fixture preview render exactly the same thing.
 
-import { addDays, formatShortDate, mondayOf } from "@/lib/dates";
+import { addDays, formatShortDate } from "@/lib/dates";
 import { formatNumber } from "@/lib/format";
 import {
   ACWR_SAFE,
@@ -459,8 +459,4 @@ function round(v: number, digits: number) {
 
 function roundOrNull(v: number | null, digits: number) {
   return v === null ? null : round(v, digits);
-}
-
-function sum(values: number[]) {
-  return values.reduce((s, x) => s + x, 0);
 }
