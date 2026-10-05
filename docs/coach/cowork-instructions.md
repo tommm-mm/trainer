@@ -75,6 +75,10 @@ RIR**, add one weight step next session and restart at the bottom of the range.
 
 ### Base program, 5 Oct – 29 Nov (gym focus: hypertrophy, upper-body led)
 
+**Loaded in the app's gym templates A/B/C on 5 Oct** (sets, rep ranges, RIR, rest, start weights in the
+notes), so the logger shows the targets and prefills weights. Progression changes (extra sets in week 3,
+deloads) are told in session notes; the templates stay at the base values.
+
 Tommaso wants more gym in this phase. Base is the right time (running is almost all easy), but extra
 volume goes to the **upper body**; legs stay strength-oriented and controlled because mileage rises.
 Intensity = reps in reserve (RIR). With the app's e1RM formula, 6–8 reps @ RIR 2 ≈ 75–80% of 1RM,
