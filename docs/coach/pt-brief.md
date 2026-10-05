@@ -187,12 +187,21 @@ where s.status = 'approved' and w.week_start between date_trunc('week', current_
                                                  and date_trunc('week', current_date)::date + 7
 order by w.week_start;
 
+-- Load by type (AU), planned load and the 80/20 split (computed by the app; read, don't recompute)
+select week_start, run, gym, hiit, cross_training, total, estimated_share from weekly_load
+where week_start >= date_trunc('week', current_date)::date - 35 order by week_start;
+select week_start, planned, planned_source from season_week_load
+where season_status = 'approved' and week_start between date_trunc('week', current_date)::date - 7
+                                                     and date_trunc('week', current_date)::date + 7;
+select week_start, band_easy_min, band_moderate_min, band_hard_min, easy_share, missing from weekly_zones
+where week_start >= date_trunc('week', current_date)::date - 21 order by week_start;
+
 -- What is already planned for next week
 select day, session_type, target_distance_km, status, notes from weekly_plans
 where week_start_date = date_trunc('week', current_date)::date + 7 order by day;
 ```
 
-(`seasons`, `mesocycles`, `season_weeks` are live since 5 Oct 2026. The approved season is the source of truth; section 4 is the version Tommaso reviewed.)
+(`seasons`, `mesocycles`, `season_weeks` are live since 5 Oct 2026; the load and zone views since step L. The approved season is the source of truth; section 4 is the version Tommaso reviewed.)
 
 ## 9. Writing proposals (only these two, nothing else)
 
@@ -224,7 +233,8 @@ select create_season_proposal('bb8ab389-1eae-402b-bf36-a0c1f99c1d46', '<SeasonDr
 The draft is the **whole** season (copy the approved one, change what you need, keep past weeks
 identical): `{ "title", "source": "cowork", "rationale", "limits", "blocks": [{ "name", "focus",
 "gym_focus", "purpose", "key_sessions", "weeks": [{ "week_start", "is_deload", "run_km", "long_run_km",
-"runs", "quality_sessions", "gym_sessions", "cross_sessions", "key_session", "milestone" }] }] }`.
+"runs", "quality_sessions", "gym_sessions", "cross_sessions", "load_target"?, "key_session", "milestone" }] }] }`.
+`load_target` (AU) is optional: without it the app estimates the week's load from its targets.
 `focus` ∈ base, build, specific, peak, taper, recovery, transition. Weeks are consecutive Mondays.
 Always explain the change in `rationale`.
 
