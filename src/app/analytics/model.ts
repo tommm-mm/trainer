@@ -8,6 +8,8 @@ import {
   ACWR_SAFE,
   EASY_MAX_HRR,
   EASY_MAX_RPE,
+  LOAD_TYPES,
+  LOAD_TYPE_LABELS,
   LONG_RUN_MIN_WEEK_KM,
   LONG_RUN_SHARE,
   MONOTONY_HIGH,
@@ -23,6 +25,7 @@ import {
   trainingSummary,
   weekStarts,
   weeklyAerobic,
+  weeklyLoads,
   weeklyMonotony,
   weeklyRunning,
   type ActivityInput,
@@ -219,38 +222,30 @@ export function buildStats(input: StatsInput): StatsModel {
     },
   };
 
-  // ---- weekly load (sRPE), stacked, + 4-week average
-  const weeklyLoad = weeks.map((w) => {
-    const days = daily.filter((d) => mondayOf(d.date) === w);
-    return { week: w, run: sum(days.map((d) => d.run)), gym: sum(days.map((d) => d.gym)) };
-  });
-  const loadTrend = rollingMean(weeklyLoad.map((w) => (complete(w.week) ? w.run + w.gym : null)), 4);
+  // ---- weekly load (sRPE) by type, stacked, + 4-week average
+  const weeklyLoad = weeklyLoads(sessions, weeks);
+  const loadTrend = rollingMean(weeklyLoad.map((w) => (complete(w.week) ? w.total : null)), 4);
   const load: Block = {
     id: "load",
     title: "Weekly training load",
     verdict: v.rpe,
-    how: "Load = minutes × effort (RPE 1–10), in arbitrary units (AU). Gym counts too, because fatigue adds up wherever it comes from. Dashed line = 4-week average. Sessions without a rating use an estimate.",
+    how: "Load = minutes × effort (RPE 1–10), in arbitrary units (AU). Gym, HIIT and bike/swim count too, because fatigue adds up wherever it comes from; only runs add impact. Dashed line = 4-week average. Sessions without a rating use an estimate.",
     chart: {
       data: weeklyLoad.map((w, i) => ({
         label: label(w.week),
-        run: Math.round(w.run),
-        gym: Math.round(w.gym),
+        ...Object.fromEntries(LOAD_TYPES.map((t) => [t, w[t]])),
         avg: loadTrend[i] === null ? null : Math.round(loadTrend[i]!),
       })),
-      bars: [
-        { key: "run", name: "Run", color: COLORS.run, stackId: "l" },
-        { key: "gym", name: "Gym, HIIT, bike/swim", color: COLORS.gym, stackId: "l" },
-      ],
+      bars: LOAD_TYPES.map((t) => ({ key: t, name: LOAD_TYPE_LABELS[t], color: COLORS[t], stackId: "l" })),
       trend: { key: "avg", name: "4-week average" },
       format: "load",
     },
     table: {
-      headers: ["Week", "Run", "Other", "Total"],
+      headers: ["Week", ...LOAD_TYPES.map((t) => LOAD_TYPE_LABELS[t]), "Total"],
       rows: weeklyLoad.map((w) => [
         label(w.week) + (complete(w.week) ? "" : "*"),
-        formatNumber(w.run, 0),
-        formatNumber(w.gym, 0),
-        formatNumber(w.run + w.gym, 0),
+        ...LOAD_TYPES.map((t) => formatNumber(w[t], 0)),
+        formatNumber(w.total, 0),
       ]),
     },
   };

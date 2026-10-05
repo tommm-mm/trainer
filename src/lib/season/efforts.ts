@@ -2,7 +2,7 @@
 // (Karvonen %HRR on your Garmin anchors); paces are the targets at goal
 // fitness and get replaced by test results (5 km time trial, 30′ test).
 
-import type { HrAnchors } from "@/lib/metrics";
+import { scaledHrr, type ZoneAnchors } from "@/lib/zones";
 
 export type Effort = {
   key: "recovery" | "easy" | "marathon" | "threshold" | "vo2";
@@ -27,15 +27,16 @@ export const EFFORTS: Effort[] = [
   { key: "vo2", label: "Intervals", hrr: [0.9, 0.97], feel: "Hard, 5–10 km race effort", use: "3–4′ repeats, a few in Build", paceFromMp: [-40, -50] },
 ];
 
-export function hrAt(hrr: number, a: Pick<HrAnchors, "rest" | "max">): number {
-  return Math.round(a.rest + hrr * (a.max - a.rest));
+/** bpm at a %HRR edge, re-centred on a measured threshold HR when there is one. */
+export function hrAt(hrr: number, a: ZoneAnchors): number {
+  return Math.round(a.rest + scaledHrr(hrr, a) * (a.max - a.rest));
 }
 
 export type EffortRow = Effort & { hrLow: number; hrHigh: number; pace: [number, number] | null };
 
-/** Zones with bpm from your anchors and pace (s/km) from the goal marathon pace. */
+/** Zones with bpm from your anchors (and threshold test) and pace (s/km) from the goal marathon pace. */
 export function effortTable(
-  anchors: Pick<HrAnchors, "rest" | "max">,
+  anchors: ZoneAnchors,
   marathonPaceSecPerKm: number | null,
 ): EffortRow[] {
   return EFFORTS.map((e) => ({
