@@ -37,9 +37,19 @@ export function scaledHrr(hrr: number, a: ZoneAnchors): number {
   return Math.min(1, hrr * zoneScale(a));
 }
 
-/** Whole-bpm lower bounds of easy, marathon, threshold, VO₂ (same rounding as the Efforts table). */
+/**
+ * bpm at a %HRR edge, to the whole beat. Rounded to 6 decimals first so an
+ * exact half (145.5) rounds the same here and in the SQL views (float vs
+ * numeric arithmetic would otherwise land on 145.4999… or 145.5000…).
+ */
+export function bpmAt(hrr: number, a: ZoneAnchors): number {
+  const x = a.rest + scaledHrr(hrr, a) * (a.max - a.rest);
+  return Math.round(Math.round(x * 1e6) / 1e6);
+}
+
+/** Whole-bpm lower bounds of easy, marathon, threshold, VO₂ (same as the Efforts table). */
 export function zoneCuts(a: ZoneAnchors): number[] {
-  return ZONE_EDGES_HRR.map((e) => Math.round(a.rest + scaledHrr(e, a) * (a.max - a.rest)));
+  return ZONE_EDGES_HRR.map((e) => bpmAt(e, a));
 }
 
 /** Zone index 0–4 of a heart rate. */

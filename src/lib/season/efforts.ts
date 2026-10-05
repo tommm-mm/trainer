@@ -2,7 +2,7 @@
 // (Karvonen %HRR on your Garmin anchors); paces are the targets at goal
 // fitness and get replaced by test results (5 km time trial, 30′ test).
 
-import { scaledHrr, type ZoneAnchors } from "@/lib/zones";
+import { bpmAt, type ZoneAnchors } from "@/lib/zones";
 
 export type Effort = {
   key: "recovery" | "easy" | "marathon" | "threshold" | "vo2";
@@ -29,7 +29,7 @@ export const EFFORTS: Effort[] = [
 
 /** bpm at a %HRR edge, re-centred on a measured threshold HR when there is one. */
 export function hrAt(hrr: number, a: ZoneAnchors): number {
-  return Math.round(a.rest + scaledHrr(hrr, a) * (a.max - a.rest));
+  return bpmAt(hrr, a);
 }
 
 export type EffortRow = Effort & { hrLow: number; hrHigh: number; pace: [number, number] | null };

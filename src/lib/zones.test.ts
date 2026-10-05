@@ -35,6 +35,10 @@ describe("zone cuts", () => {
     expect(effortTable(t, null)[3].hrLow).toBe(175);
   });
 
+  it("round exact halves up, like the SQL views (148 × 0.65 × 1.0135 = 97.5 → 145.5 → 146)", () => {
+    expect(zoneCuts({ rest: 48, max: 196, threshold: 174 })).toEqual([146, 161, 174, 183]);
+  });
+
   it("ignore an implausible threshold", () => {
     expect(zoneScale({ ...a, threshold: 40 })).toBe(1);
     expect(zoneScale({ ...a, threshold: 200 })).toBe(1);

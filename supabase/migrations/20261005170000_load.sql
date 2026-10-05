@@ -111,12 +111,13 @@ end $$;
 -- Anchors and zone cut-offs per user (defaults until the first sync).
 -- Cuts = lower bpm of easy, marathon, threshold, VO₂ (65 / 75 / 84 / 90% HRR),
 -- every edge scaled so 84% lands on a measured threshold HR (src/lib/zones.ts).
+-- Rounded to 6 decimals first so exact halves round like the app (bpmAt).
 create view public.hr_zone_cuts with (security_invoker = true) as
 select s.user_id, s.rest_hr, s.max_hr, s.threshold_hr, s.threshold_date,
-       round(s.rest_hr + least(1, 0.65 * k) * (s.max_hr - s.rest_hr))::int as easy_from,
-       round(s.rest_hr + least(1, 0.75 * k) * (s.max_hr - s.rest_hr))::int as marathon_from,
-       round(s.rest_hr + least(1, 0.84 * k) * (s.max_hr - s.rest_hr))::int as threshold_from,
-       round(s.rest_hr + least(1, 0.90 * k) * (s.max_hr - s.rest_hr))::int as vo2_from
+       round(round(s.rest_hr + least(1, 0.65 * k) * (s.max_hr - s.rest_hr), 6))::int as easy_from,
+       round(round(s.rest_hr + least(1, 0.75 * k) * (s.max_hr - s.rest_hr), 6))::int as marathon_from,
+       round(round(s.rest_hr + least(1, 0.84 * k) * (s.max_hr - s.rest_hr), 6))::int as threshold_from,
+       round(round(s.rest_hr + least(1, 0.90 * k) * (s.max_hr - s.rest_hr), 6))::int as vo2_from
 from public.athlete_settings s
 cross join lateral (
   select case when s.threshold_hr > s.rest_hr and s.threshold_hr < s.max_hr
@@ -231,7 +232,9 @@ left join z on z.user_id = w.user_id and z.week_start = w.week_start;
 -- calibration (src/lib/load.ts), the coach's load_target, and what counts.
 create view public.season_week_load with (security_invoker = true) as
 with c as (
-  select s.user_id,
+  -- Defaults (DEFAULT_CALIBRATION) until the first sync writes the calibration.
+  select w.id, w.user_id, w.season_id, w.week_start, w.is_deload, w.load_target,
+         w.run_km, w.quality_sessions, w.gym_sessions, w.cross_sessions,
          coalesce((s.load_calibration->>'easy_min_per_km')::numeric, 6.3) as easy_min_per_km,
          coalesce((s.load_calibration->>'easy_rpe')::numeric, 4) as easy_rpe,
          coalesce((s.load_calibration->>'gym_min')::numeric, 70) as gym_min,
@@ -239,18 +242,18 @@ with c as (
          coalesce((s.load_calibration->>'cross_min')::numeric, 40) as cross_min,
          coalesce((s.load_calibration->>'cross_rpe')::numeric, 3) as cross_rpe,
          coalesce((s.load_calibration->>'hiit_week')::numeric, 0) as hiit_week
-  from public.athlete_settings s
+  from public.season_weeks w
+  left join public.athlete_settings s on s.user_id = w.user_id
 ),
 e as (
-  select w.id, w.user_id, w.season_id, w.week_start, w.is_deload, w.load_target,
-    round(coalesce(w.run_km, 0) * c.easy_min_per_km * c.easy_rpe
-          + coalesce(w.quality_sessions, 0) * 25 * greatest(0, 7 - c.easy_rpe))::int as run,
-    round(coalesce(w.gym_sessions, 0) * c.gym_min * c.gym_rpe * case when w.is_deload then 0.6 else 1 end)::int as gym,
-    round(case when coalesce(w.gym_sessions, 0) > 0
-               then c.hiit_week * case when w.is_deload then 0.5 else 1 end else 0 end)::int as hiit,
-    round(coalesce(w.cross_sessions, 0) * c.cross_min * c.cross_rpe)::int as cross_training
-  from public.season_weeks w
-  join c on c.user_id = w.user_id
+  select c.id, c.user_id, c.season_id, c.week_start, c.is_deload, c.load_target,
+    round(coalesce(c.run_km, 0) * c.easy_min_per_km * c.easy_rpe
+          + coalesce(c.quality_sessions, 0) * 25 * greatest(0, 7 - c.easy_rpe))::int as run,
+    round(coalesce(c.gym_sessions, 0) * c.gym_min * c.gym_rpe * case when c.is_deload then 0.6 else 1 end)::int as gym,
+    round(case when coalesce(c.gym_sessions, 0) > 0
+               then c.hiit_week * case when c.is_deload then 0.5 else 1 end else 0 end)::int as hiit,
+    round(coalesce(c.cross_sessions, 0) * c.cross_min * c.cross_rpe)::int as cross_training
+  from c
 )
 select e.id as season_week_id, e.user_id, e.season_id, s.status as season_status, e.week_start, e.is_deload,
        e.run, e.gym, e.hiit, e.cross_training,
