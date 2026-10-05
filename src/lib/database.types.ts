@@ -238,6 +238,140 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["goals"]["Insert"]>
         Relationships: []
       }
+      mesocycles: {
+        Row: {
+          focus: string
+          gym_focus: string | null
+          id: string
+          key_sessions: string | null
+          name: string
+          position: number
+          purpose: string | null
+          season_id: string
+          user_id: string
+        }
+        Insert: {
+          focus: string
+          gym_focus?: string | null
+          id?: string
+          key_sessions?: string | null
+          name: string
+          position: number
+          purpose?: string | null
+          season_id: string
+          user_id?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["mesocycles"]["Insert"]>
+        Relationships: [
+          {
+            foreignKeyName: "mesocycles_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      season_weeks: {
+        Row: {
+          gym_sessions: number | null
+          cross_sessions: number | null
+          id: string
+          is_deload: boolean
+          key_session: string | null
+          long_run_km: number | null
+          mesocycle_id: string
+          milestone: string | null
+          notes: string | null
+          quality_sessions: number | null
+          run_km: number | null
+          runs: number | null
+          season_id: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          gym_sessions?: number | null
+          cross_sessions?: number | null
+          id?: string
+          is_deload?: boolean
+          key_session?: string | null
+          long_run_km?: number | null
+          mesocycle_id: string
+          milestone?: string | null
+          notes?: string | null
+          quality_sessions?: number | null
+          run_km?: number | null
+          runs?: number | null
+          season_id: string
+          user_id?: string
+          week_start: string
+        }
+        Update: Partial<Database["public"]["Tables"]["season_weeks"]["Insert"]>
+        Relationships: [
+          {
+            foreignKeyName: "season_weeks_mesocycle_id_fkey"
+            columns: ["mesocycle_id"]
+            isOneToOne: false
+            referencedRelation: "mesocycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "season_weeks_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seasons: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          goal_id: string
+          id: string
+          limits: Json
+          rationale: string | null
+          source: string
+          status: string
+          supersedes_id: string | null
+          title: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          goal_id: string
+          id?: string
+          limits?: Json
+          rationale?: string | null
+          source?: string
+          status?: string
+          supersedes_id?: string | null
+          title: string
+          user_id?: string
+          version: number
+        }
+        Update: Partial<Database["public"]["Tables"]["seasons"]["Insert"]>
+        Relationships: [
+          {
+            foreignKeyName: "seasons_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seasons_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_exercises: {
         Row: {
           block: string
@@ -493,6 +627,8 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      approve_season: { Args: { p_season_id: string }; Returns: undefined }
+      create_season_proposal: { Args: { p_goal_id: string; p_draft: Json }; Returns: string }
       is_muscle_list: { Args: { m: string[] }; Returns: boolean }
     }
     Enums: { [_ in never]: never }

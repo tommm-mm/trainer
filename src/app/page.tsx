@@ -20,6 +20,9 @@ import { loadStrength } from "@/lib/gym/queries";
 import { todayAction } from "@/lib/gym/today";
 import { muscleSets, type StrengthSession } from "@/lib/strength";
 import { MuscleMeters } from "@/components/muscle-meters";
+import { TargetMeters } from "@/components/season-targets";
+import { loadSeasonWeek } from "@/lib/season/queries";
+import { weeklyActuals } from "@/lib/season/progress";
 import { signOut } from "./actions";
 import { approveWeek, resolveFlag } from "./week/actions";
 import { PlanRow, type PlanTemplate } from "./week/plan-row";
@@ -95,6 +98,9 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .limit(5),
     loadStrength(supabase, { from: monday, to: sunday }).catch(() => null),
   ]);
+
+  // This week's targets from the approved season (Season tab).
+  const seasonWeek = goal ? await loadSeasonWeek(supabase, goal.id, monday).catch(() => null) : null;
 
   const plans = plansRes.data ?? [];
   const activities = activitiesRes.data ?? [];
@@ -192,6 +198,30 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
         </Link>
         <GoalChip goal={goal} today={today} />
       </nav>
+
+      {seasonWeek && (
+        <Link href="/season" className={`${cardCls} mb-4 flex flex-col gap-3`}>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-xs uppercase tracking-wide text-emerald-400">
+              {seasonWeek.block.name} · week {seasonWeek.weekInBlock}/{seasonWeek.block.weeks.length}
+              {seasonWeek.week.is_deload && " · lighter"}
+            </p>
+            <span className="text-xs text-neutral-500">Season →</span>
+          </div>
+          <TargetMeters
+            targets={seasonWeek.week}
+            actual={weeklyActuals(
+              activities.map((a) => ({ date: a.date, type: a.type, distance_km: a.distance_km })),
+              workouts.map((w) => w.date),
+            ).get(monday)}
+            finished={sunday < today}
+          />
+          {seasonWeek.week.key_session && (
+            <p className="text-sm text-neutral-300">Key: {seasonWeek.week.key_session}</p>
+          )}
+          {seasonWeek.week.milestone && <p className="text-sm text-amber-300">⚑ {seasonWeek.week.milestone}</p>}
+        </Link>
+      )}
 
       {loadError && (
         <p className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-300">

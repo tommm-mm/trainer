@@ -16,9 +16,16 @@ describe("classifyActivity", () => {
     expect(classifyActivity("Workout", "Strength")).toBe("gym");
   });
 
+  it("keeps bike and swim as cross-training", () => {
+    expect(classifyActivity("Ride", "Bike")).toBe("cross");
+    expect(classifyActivity("VirtualRide", "Cyclette")).toBe("cross");
+    expect(classifyActivity("Swim", null)).toBe("cross");
+    expect(classifyActivity("OpenWaterSwim", null)).toBe("cross");
+  });
+
   it("skips other sports", () => {
-    expect(classifyActivity("Ride", "Bike")).toBeNull();
-    expect(classifyActivity("Swim", null)).toBeNull();
+    expect(classifyActivity("Walk", null)).toBeNull();
+    expect(classifyActivity("Golf", null)).toBeNull();
   });
 });
 

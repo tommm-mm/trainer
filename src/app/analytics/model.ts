@@ -239,13 +239,13 @@ export function buildStats(input: StatsInput): StatsModel {
       })),
       bars: [
         { key: "run", name: "Run", color: COLORS.run, stackId: "l" },
-        { key: "gym", name: "Gym + HIIT", color: COLORS.gym, stackId: "l" },
+        { key: "gym", name: "Gym, HIIT, bike/swim", color: COLORS.gym, stackId: "l" },
       ],
       trend: { key: "avg", name: "4-week average" },
       format: "load",
     },
     table: {
-      headers: ["Week", "Run", "Gym+HIIT", "Total"],
+      headers: ["Week", "Run", "Other", "Total"],
       rows: weeklyLoad.map((w) => [
         label(w.week) + (complete(w.week) ? "" : "*"),
         formatNumber(w.run, 0),

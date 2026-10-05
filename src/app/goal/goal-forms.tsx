@@ -2,9 +2,9 @@
 
 import { useActionState, useState, useTransition } from "react";
 import type { ActionState } from "@/lib/form";
-import { GOAL_TYPES, GOAL_TYPE_LABELS, PHASES, type GoalType } from "@/lib/domain";
+import { GOAL_TYPES, GOAL_TYPE_LABELS, type GoalType } from "@/lib/domain";
 import { btnPrimary, btnSmall, inputCls, labelCls } from "@/components/ui";
-import { createGoal, updateRaceProgress } from "./actions";
+import { createGoal } from "./actions";
 
 /** A button that runs a no-arg server action and shows its error, if any. */
 export function ActionButton({
@@ -39,53 +39,6 @@ export function ActionButton({
       </button>
       {error && <span className="mt-1 text-xs text-red-400">{error}</span>}
     </span>
-  );
-}
-
-export function RaceProgressForm({
-  id,
-  phase,
-  buildWeek,
-  deload,
-}: {
-  id: string;
-  phase: string | null;
-  buildWeek: number | null;
-  deload: boolean;
-}) {
-  const [state, action, pending] = useActionState(updateRaceProgress, { error: null });
-
-  return (
-    <form action={action} className="grid grid-cols-3 items-end gap-2">
-      <input type="hidden" name="id" value={id} />
-      <label className={labelCls}>
-        Phase
-        <select name="phase" defaultValue={phase ?? "base"} className={inputCls}>
-          {PHASES.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className={labelCls}>
-        Build week
-        <input
-          name="build_week_number"
-          inputMode="numeric"
-          defaultValue={buildWeek ?? ""}
-          className={inputCls}
-        />
-      </label>
-      <label className="flex items-center gap-2 pb-2.5 text-xs text-neutral-300">
-        <input type="checkbox" name="deload_week" defaultChecked={deload} className="h-4 w-4" />
-        Deload
-      </label>
-      <button disabled={pending} className={`${btnSmall} col-span-3 justify-self-start`}>
-        {pending ? "Saving…" : state.ok ? "Saved ✓" : "Save"}
-      </button>
-      {state.error && <p className="col-span-3 text-xs text-red-400">{state.error}</p>}
-    </form>
   );
 }
 

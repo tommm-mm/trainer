@@ -128,7 +128,7 @@ export function sessionLoads(activities: ActivityInput[], anchors: HrAnchors): S
     if (a.rpe != null) {
       rpe = a.rpe;
       rpeSource = "entered";
-    } else if (a.type === "run" && a.avg_hr) {
+    } else if ((a.type === "run" || a.type === "cross") && a.avg_hr) {
       rpe = rpeFromHr(a.avg_hr, anchors);
       rpeSource = "hr";
     } else if (medians[a.type] != null) {
