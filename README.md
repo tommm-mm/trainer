@@ -12,14 +12,18 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | A | London region, Garmin sync via intervals.icu, auto-tick plans, post-workout feedback | ✅ |
 | B | Check-in + Analytics (volume, long-run share, ACWR, monotony, HR trend) | ✅ |
 | G | Gym logger, template editor, gym Stats, Today card, live meters, auto-refresh | ✅ |
-| C1 | Season model: goal → season → blocks → weekly targets, versioned proposals, guardrails, Season page | 🔍 review |
+| C1 | Season model for any goal: goal → season → blocks → weekly targets, versioned proposals, guardrails, Season page, cross-training | ✅ |
+| Coach | Cowork PT: instructions, weekly review, writes `proposed` sessions / season versions via the Supabase connector (`docs/coach/`) | ✅ |
+| L | Load = volume × intensity: planned weekly load (sRPE) per season week, load-based guardrails, time in HR zones (80/20 check) | ⏳ next |
+| C2 | Rules engine (pure, tested): run progression (≤10%/wk, long run share, 80/20), gym progression (double progression at RIR, sets/muscle per block), spacing & safety guards; week generator from season targets + free days | ⏳ |
+| D0 | Coach inbox: one contract any coach writes to (proposed plans + exercise targets + rationale), validated by C2, approved in the app; restricted DB access for coaches | 🟡 via SQL + brief |
 | W | Garmin wellness sync (VO₂max, HRV, resting HR, sleep, CTL/ATL) → Stats › Fitness | ⏳ |
-| C2 | Week generator: season targets + days you can train → proposed sessions | ⏳ |
-| D0 | Coach inbox: Cowork / Claude API write proposals through the season contract | 🟡 via SQL + brief; dedicated inbox ⏳ |
-| C | Stub `/api/generate-week` + "Generate my week" | ⏳ → C2 |
-| D | Real Claude call + goal-type branching + flags | ⏳ |
-| E | Scheduled AI draft (Vercel Cron, 2x/week) | ⏳ |
-| F | PWA install on phone | ⏳ |
+| D1 | AI planner (Claude API): season, blocks and weekly plan with reasons; Regenerate with a reason | ⏳ |
+| D2 | Flexible week (sessions by priority, reshuffle when life happens) + weekly coach review with memory | ⏳ |
+| E | Automatic Sunday plan (Vercel Cron) | ⏳ |
+| F | PWA install + offline shell + "your week is ready" notification | ⏳ |
+| U | UX/UI review: missing tools and features, cleaner and more intuitive screens (after the coach works end to end) | ⏳ |
+| Later | "Ask coach" chat in the app; next season after Padova | ⏳ |
 
 ## Garmin sync
 

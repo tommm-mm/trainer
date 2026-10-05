@@ -61,7 +61,7 @@ RIR**, add one weight step next session and restart at the bottom of the range.
 
 | Block | Sessions | Main lifts | Accessories | Legs | Session |
 |---|---|---|---|---|---|
-| Base (→ 29 Nov) | 3× full body | 3×6–8 @ RIR 2 | 2–3×8–12 @ RIR 1–2 | 3×6–10 @ RIR 2–3 | ≤ 60–70′, ≤ 20 working sets |
+| Base (→ 29 Nov) | 3× full body | 4×6–10 @ RIR 1–2 | 2–3×8–15 @ RIR 0–1 | 3×6–10 @ RIR 2–3 | 60–70′, ~20 working sets (program below) |
 | Build (30 Nov – 24 Jan) | 2× strength | 3×4–6 @ RIR 2 | 2×8–12 @ RIR 1–2 | heavy 3×4–6 @ RIR 2–3 + box jumps / pogo 3×5 | ≤ 60′ |
 | Specific + Peak (25 Jan – 28 Mar) | 2× maintenance | 2×4–6 @ RIR 2–3, same weights | 1–2 sets | 2×5 @ RIR 3 | ~40′ |
 | Taper | 1× light, last 10 days out | 2×5 @ RIR 3–4 | – | – | ~30′ |
@@ -73,17 +73,66 @@ RIR**, add one weight step next session and restart at the bottom of the range.
   from Build replace them with core or plyometrics.
 - Volume: 10–20 hard sets/week per upper-body muscle in Base; legs 6–10 (running adds the rest).
 
-Starting points from the logs (29 Sep, 4 Oct):
-- Military press: 50×6 @2 then 40×8 → **45 kg 3×6–8 @2**.
-- Bent-over row: 80×6 @1 ×4 → **80 kg 3×6–8 @2**, reach 8 then +2.5.
-- Chest press (machine): 70×8 @2, 80×7 @0 → **70–75 kg 3×8–10**.
-- Seated row (machine): 86×8 ×5 sets → **3×8–10**, then +1 step.
-- Romanian deadlift (DB): 24×12 @4 (too easy) → **26–28 kg 3×8–10 @2–3**.
-- Bulgarian split squat: 24×8–10 @3 → **24 kg 3×8 @2–3** (C is the day after the long run).
-- Hip thrust: 0 sets logged on 29 Sep → do it, **3×8–10 @2–3** (glutes drive running).
-- Calf raise: bodyweight 3×15 → **add load, 3×12–15 with a 3 s lowering** (calves are the watch point).
-- Squat (A): no log yet → first session find a weight for **3×6–8 @ RIR 3**.
-- Template C (27 working sets, 90′) → trim to ~20: chest fly 2 sets, curls and pushdowns 2 each.
+### Base program, 5 Oct – 29 Nov (gym focus: hypertrophy, upper-body led)
+
+Tommaso wants more gym in this phase. Base is the right time (running is almost all easy), but extra
+volume goes to the **upper body**; legs stay strength-oriented and controlled because mileage rises.
+Intensity = reps in reserve (RIR). With the app's e1RM formula, 6–8 reps @ RIR 2 ≈ 75–80% of 1RM,
+8–12 @ RIR 1 ≈ 70–77%, 12–15 @ RIR 0–1 ≈ 65–71%. Rest 2–3′ on compounds, 60–90″ on isolation.
+Lower each rep in ~2 s. Warm-up: 5′ + 2 ramp-up sets on the first lift.
+
+**A · Tuesday, after the easy run** (squat day)
+
+| Exercise | Sets × reps | RIR | Start |
+|---|---|---|---|
+| Back squat | 3 × 6–8 | 3 | find it in session 1 |
+| Incline DB press | 4 × 8–10 | 1–2 | find it |
+| Lat pulldown | 4 × 8–12 | 1 | find it |
+| Lateral raise (machine) | 3 × 12–15 | 0–1 | find it |
+| EZ-bar curl | 3 × 8–12 | 1 | find it |
+| Triceps pushdown | 3 × 10–12 | 1 | 31.5 kg |
+| Finisher (≤ 10′): KB swing 3 × 15 + plank 3 × 45″ | | | |
+
+**B · Thursday, ≥ 3 h after the quality run** (press + glutes)
+
+| Exercise | Sets × reps | RIR | Start |
+|---|---|---|---|
+| Box jump (first, fresh) | 3 × 5 | – | step down, don't jump down |
+| Standing military press | 4 × 6–8 | 2 | 45 kg |
+| Bent-over row | 4 × 6–8 | 1–2 | 80 kg |
+| Hip thrust (machine) | 3 × 8–10 | 2–3 | find it |
+| Seated incline DB curl | 3 × 8–10 | 1 | 16 kg |
+| Overhead cable triceps ext. | 3 × 8–12 | 1 | 20.3 kg |
+| Standing calf raise, loaded | 3 × 12–15, 3 s down | 1–2 | add load |
+| Finisher: Russian twist 3 × 20 | | | |
+
+**C · Sunday, after the recovery run** (day after the long run, so legs stay at RIR 2–3)
+
+| Exercise | Sets × reps | RIR | Start |
+|---|---|---|---|
+| Chest press (machine) | 4 × 8–10 | 1–2 | 70 kg |
+| Seated row (machine) | 4 × 8–10 | 1–2 | 86 kg |
+| Romanian deadlift (DB) | 3 × 8–10 | 2–3 | 26 kg |
+| Bulgarian split squat (DB) | 3 × 8 per leg | 2–3 | 24 kg |
+| Chest fly (machine) | 3 × 12–15 | 0–1 | 66 kg |
+| Preacher curl (machine) | 2 × 10–12 | 1 | 50 kg |
+| Triceps pushdown | 2 × 10–12 | 1 | 31.5 kg |
+| No HIIT finisher (sled/burpees dropped: the long run was yesterday) | | | |
+
+≈ 20 working sets per session, 60–70′. Weekly hard sets (primary 1, secondary 0.5): chest ~11,
+back ~13, shoulders ~15, biceps ~14, triceps ~14, glutes ~12, quads 6, hamstrings ~4.5, calves 3.
+Upper body sits in the 10–20 growth range; quads/hamstrings get the rest from running.
+
+**Week by week** (follows the running blocks):
+
+| Week of | Running | Gym |
+|---|---|---|
+| 5 Oct, 2 Nov | build | sets as above; double progression on weights |
+| 12 Oct, 9 Nov | build | +1 set on the two upper-body compounds of each session (A: incline, pulldown · B: press, row · C: chest press, seated row) |
+| 19 Oct, 16 Nov | build | same sets; last set of upper-body accessories to RIR 0 |
+| 26 Oct, 23 Nov | lighter | deload: 2 sessions, half the sets, same weights, RIR 3–4 (5 km test on 31 Oct) |
+
+If the calves are sore or a run felt heavy: drop the leg sets of the next session first, never the run.
 
 ## Tests
 
