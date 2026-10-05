@@ -1,11 +1,12 @@
 # Cowork PT: setup kit
 
-Three things to paste: the project **instructions** (`cowork-instructions.md`), the **scheduled
-task** prompt and the **first message** below. Full plan reference: `pt-brief.md`.
+Three things to paste: the project **instructions** (`cowork-instructions.md`: Part A lifelong, Part B
+current season), the **scheduled task** prompt and the **first message** below. Padova reference:
+`pt-brief.md`. When a goal changes, only Part B of the instructions is replaced.
 
 ## 1. Create the project
 
-1. Claude app → left sidebar **Projects** → **+** → **Start from scratch**. Name: `PT · Padova 2027`.
+1. Claude app → left sidebar **Projects** → **+** → **Start from scratch**. Name: **`Personal Trainer`** (one lifelong project: its memory stays when goals change).
 2. **Instructions**: paste the whole of `cowork-instructions.md`.
 3. Connectors: **Customize → Connectors** → make sure **Supabase** is connected (it's on your
    account). In a task, the **+** menu in the message box shows which connectors are on.
@@ -13,7 +14,7 @@ task** prompt and the **first message** below. Full plan reference: `pt-brief.md
 ## 2. First message (in a new task inside the project)
 
 ```
-Hi, you're my PT from today. Read your project instructions.
+Hi, you're my personal trainer from today, for this marathon and whatever comes after. Read your project instructions.
 1) Run: select count(*) from activities;  and tell me the number (to check your data access).
 2) Read this week's proposed sessions (week of 5 Oct) and the season targets, and tell me if you'd change anything.
 3) Remember: you only propose, I approve in the app.
