@@ -177,6 +177,11 @@ order by l.week_start;
 select week_start, band_easy_min, band_moderate_min, band_hard_min, easy_share, missing,
        recovery_min, easy_min, marathon_min, threshold_min, vo2_min
 from weekly_zones where week_start >= date_trunc('week', current_date)::date - 21 order by week_start;
+-- gym suggestions he accepted this and last week (the app proposes sets × reps @ RIR + add/same/lower weight)
+select x.week_start, t.name template, e.name exercise, x.sets, x.rep_min, x.rep_max, x.target_rir, x.rationale
+from exercise_targets x join template_exercises te on te.id = x.template_exercise_id
+join workout_templates t on t.id = te.template_id join exercises e on e.id = te.exercise_id
+where x.week_start >= date_trunc('week', current_date)::date - 7 order by x.week_start, t.name;
 -- zone limits in bpm (anchors + threshold test) and the load calibration
 select rest_hr, max_hr, threshold_hr, threshold_date, easy_from, marathon_from, threshold_from, vo2_from from hr_zone_cuts;
 select load_calibration, updated_at from athlete_settings;
@@ -208,7 +213,8 @@ checks on the Season page. Block `focus` ∈ base, build, specific, peak, taper,
 1. Read the data (all queries above).
 2. Review last week in ≤ 5 lines: done vs target, **load by type vs planned and change vs last
    week** (`weekly_load`, `season_week_load`), **80/20** (`weekly_zones`), how the key session went
-   (pace vs HR), gym progression (any lift ready for +1 step?), secondary goals, recovery flags.
+   (pace vs HR), gym progression (the app suggests per exercise in the logger: read what he
+   accepted in `exercise_targets` and compare with what he logged), secondary goals, recovery flags.
 3. Decide next week **within that week's season targets**:
    - ≥ 90% of target done → follow the plan.
    - 70–90% → follow it, drop extra volume, keep the key session.

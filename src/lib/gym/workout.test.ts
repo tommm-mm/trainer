@@ -22,7 +22,10 @@ import {
   type HistoryRow,
   type Store,
   type TemplateInput,
+  acceptAllAdvice,
+  decideAdvice,
 } from "./workout";
+import type { Advice } from "./progression";
 
 const NOW = "2026-09-29T17:00:00.000Z";
 
@@ -280,5 +283,72 @@ describe("formatSet", () => {
     expect(formatSet({ weightKg: 62.5, reps: 8, rir: 1 }, "reps")).toBe("62.5 × 8 @1");
     expect(formatSet({ weight_kg: 0, reps: 12, rir: null }, "reps")).toBe("BW × 12");
     expect(formatSet({ weightKg: 0, reps: null, durationS: 75, rir: null }, "time")).toBe("1:15");
+  });
+});
+
+describe("progression advice", () => {
+  const advice: Advice = {
+    weight: "add",
+    sets: 4,
+    repMin: 6,
+    repMax: 8,
+    rir: 1,
+    aimReps: 6,
+    reason: "8·8·8·8 @ RIR 1: top of the range on every set",
+    basedOn: "2026-09-25",
+    repsOnly: false,
+    basisKg: 60,
+  };
+  const last = {
+    date: "2026-09-25",
+    sets: [{ weight_kg: 62.5, reps: 8, duration_s: null, rir: 1, is_warmup: false, position: 1 }],
+  };
+
+  it("accepting sets the target, the reps to aim for and starts from the judged weight", () => {
+    let s = started();
+    const we = s.doc.exercises[0].id;
+    s = decideAdvice(s, we, { ...advice, sets: 5 }, "accepted");
+    expect(s.doc.exercises[0].target).toMatchObject({ sets: 5, repMin: 6, repMax: 8, rir: 1 });
+    expect(suggestNextSet(s.doc.exercises[0], last, "reps")).toMatchObject({ weightKg: 60, reps: 6 });
+    expect(isDirty(s)).toBe(true);
+  });
+
+  it("ignoring keeps the template target and the usual prefill", () => {
+    let s = started();
+    const we = s.doc.exercises[0].id;
+    s = decideAdvice(s, we, { ...advice, sets: 5 }, "ignored");
+    expect(s.doc.exercises[0].target?.sets).toBe(4);
+    expect(suggestNextSet(s.doc.exercises[0], last, "reps")).toMatchObject({ reps: 8 });
+    expect(toRows(s, NOW).targets).toEqual([]);
+  });
+
+  it("accept all skips decided exercises and bumps the revision once", () => {
+    let s = started();
+    const [a, b] = s.doc.exercises.map((e) => e.id);
+    s = decideAdvice(s, a, advice, "ignored");
+    const rev = s.rev;
+    s = acceptAllAdvice(s, { [a]: advice, [b]: { ...advice, repMin: 10, repMax: 12 } });
+    expect(s.doc.exercises[0].advice?.status).toBe("ignored");
+    expect(s.doc.exercises[1].advice?.status).toBe("accepted");
+    expect(s.rev).toBe(rev + 1);
+    expect(acceptAllAdvice(s, { [a]: advice })).toBe(s);
+  });
+
+  it("syncs accepted advice as an approved target for that week", () => {
+    let s = started();
+    s = decideAdvice(s, s.doc.exercises[0].id, advice, "accepted");
+    expect(toRows(s, NOW).targets).toEqual([
+      {
+        template_exercise_id: "te-1",
+        week_start: "2026-09-28",
+        sets: 4,
+        rep_min: 6,
+        rep_max: 8,
+        target_rir: 1,
+        source: "engine",
+        status: "approved",
+        rationale: "add weight · 8·8·8·8 @ RIR 1: top of the range on every set",
+      },
+    ]);
   });
 });

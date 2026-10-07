@@ -53,4 +53,11 @@ export async function pushWorkout(supabase: DB, rows: SyncRows): Promise<void> {
     const { error } = await supabase.from("workout_sets").upsert(rows.sets, { onConflict: "id" });
     if (error) throw error;
   }
+  // Accepted progression suggestions: one row per template exercise and week.
+  if (rows.targets.length > 0) {
+    const { error } = await supabase
+      .from("exercise_targets")
+      .upsert(rows.targets, { onConflict: "template_exercise_id,week_start" });
+    if (error) throw error;
+  }
 }
