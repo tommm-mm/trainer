@@ -24,6 +24,8 @@ import {
   acceptAllAdvice,
 } from "@/lib/gym/workout";
 import { pendingAdvice } from "@/lib/gym/progression";
+import { blockAdjustments, STEP_LABELS, type BlockContext } from "@/lib/gym/periodization";
+import { mondayOf } from "@/lib/dates";
 import { ExerciseCard } from "./exercise-card";
 import { ExercisePicker } from "./exercise-picker";
 import { FinishSheet } from "./finish-sheet";
@@ -54,6 +56,8 @@ type Props = {
   index: ExerciseIndex;
   /** Opened from a planned session on the Week View. */
   planned: { planId: string | null; templateId: string | null } | null;
+  /** This week in the approved season (gym periodization), null outside a season. */
+  blockCtx?: BlockContext | null;
 };
 
 const uuid = () => crypto.randomUUID();
@@ -67,6 +71,7 @@ export function GymApp({
   weekSessions,
   index,
   planned,
+  blockCtx = null,
 }: Props) {
   const router = useRouter();
   const onDone = useCallback(() => router.refresh(), [router]);
@@ -138,6 +143,7 @@ export function GymApp({
       onRetry={() => void pushNow()}
       rest={rest}
       muscles={liveMuscles}
+      blockCtx={blockCtx}
     />
   );
 }
@@ -286,7 +292,9 @@ function ActiveWorkout({
   onRetry,
   rest,
   muscles,
+  blockCtx,
 }: {
+  blockCtx: BlockContext | null;
   muscles: ReturnType<typeof muscleSets>;
   store: Store;
   setStore: (next: Store | ((cur: Store | null) => Store | null)) => void;
@@ -329,9 +337,29 @@ function ActiveWorkout({
   }
 
   const totalSets = doc.exercises.reduce((n, e) => n + e.sets.filter((s) => !s.isWarmup).length, 0);
+  // The season block's change for this session (only for a workout in that week).
+  const ctx = blockCtx && blockCtx.monday === mondayOf(doc.date) ? blockCtx : null;
+  const adjustments = ctx
+    ? blockAdjustments(
+        doc.exercises.map((e) => ({
+          id: e.id,
+          block: e.block,
+          sets: e.target?.sets ?? 0,
+          rir: e.target?.rir ?? null,
+          mechanic: byId.get(e.exerciseId)?.mechanic ?? null,
+          primaryMuscles: byId.get(e.exerciseId)?.primary_muscles ?? [],
+        })).filter((e) => e.sets > 0),
+        ctx.step,
+      )
+    : new Map();
   const pending = Object.fromEntries(
     doc.exercises.flatMap((e) => {
-      const a = pendingAdvice(e, lastTime[e.exerciseId], byId.get(e.exerciseId)?.measure ?? "reps");
+      const a = pendingAdvice(
+        e,
+        lastTime[e.exerciseId],
+        byId.get(e.exerciseId)?.measure ?? "reps",
+        adjustments.get(e.id),
+      );
       return a ? [[e.id, a] as const] : [];
     }),
   );
@@ -359,6 +387,12 @@ function ActiveWorkout({
         <p className="py-6 text-center text-sm text-neutral-500">No exercises yet. Add one below.</p>
       )}
 
+      {ctx && ctx.step !== "base" && (
+        <p className="text-xs text-sky-300">
+          {ctx.block} · this week: {STEP_LABELS[ctx.step]}
+        </p>
+      )}
+
       {pendingCount > 1 && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-sky-500/30 bg-sky-500/5 px-4 py-2 text-sm">
           <span className="text-neutral-300">
@@ -384,6 +418,7 @@ function ActiveWorkout({
             ex={ex}
             info={byId.get(ex.exerciseId)}
             last={lastTime[ex.exerciseId]}
+            adjust={adjustments.get(ex.id)}
             open={openId === ex.id}
             isCurrent={i === current}
             isFirst={i === 0}
