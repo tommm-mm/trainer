@@ -7,6 +7,7 @@ import {
   estimatedLoadShare,
   hrReserve,
   isEasyRun,
+  loadType,
   MAX_HR_FLOOR,
   median,
   monotony,
@@ -18,6 +19,7 @@ import {
   trainingSummary,
   weekStarts,
   weeklyAerobic,
+  weeklyLoads,
   weeklyMonotony,
   weeklyRunning,
   type ActivityInput,
@@ -133,21 +135,61 @@ describe("session load (sRPE) with tiered RPE fallback", () => {
 });
 
 describe("daily load", () => {
-  it("fills rest days with 0 and splits run/gym", () => {
+  it("fills rest days with 0 and splits load by type", () => {
     const d = dailyLoads(
       [
         { date: "2026-09-02", type: "run", minutes: 1, rpe: 1, rpeSource: "entered", load: 100 },
         { date: "2026-09-02", type: "gym", minutes: 1, rpe: 1, rpeSource: "entered", load: 50 },
+        { date: "2026-09-02", type: "cardio", minutes: 1, rpe: 1, rpeSource: "entered", load: 20 },
+        { date: "2026-09-03", type: "cross", minutes: 1, rpe: 1, rpeSource: "entered", load: 30 },
         { date: "2026-09-09", type: "run", minutes: 1, rpe: 1, rpeSource: "entered", load: 999 }, // out of range
       ],
       "2026-09-01",
       "2026-09-03",
     );
     expect(d).toEqual([
-      { date: "2026-09-01", run: 0, gym: 0, total: 0 },
-      { date: "2026-09-02", run: 100, gym: 50, total: 150 },
-      { date: "2026-09-03", run: 0, gym: 0, total: 0 },
+      { date: "2026-09-01", run: 0, gym: 0, hiit: 0, cross: 0, total: 0 },
+      { date: "2026-09-02", run: 100, gym: 50, hiit: 20, cross: 0, total: 170 },
+      { date: "2026-09-03", run: 0, gym: 0, hiit: 0, cross: 30, total: 30 },
     ]);
+  });
+});
+
+describe("load by type", () => {
+  it("maps activity types to buckets (unknown → gym)", () => {
+    expect(loadType("run")).toBe("run");
+    expect(loadType("cardio")).toBe("hiit");
+    expect(loadType("cross")).toBe("cross");
+    expect(loadType("gym")).toBe("gym");
+    expect(loadType("yoga")).toBe("gym");
+  });
+
+  it("sums whole AU per ISO week and type, with the estimated share", () => {
+    const w = weeklyLoads(
+      [
+        { date: "2026-09-28", type: "run", minutes: 50, rpe: 4, rpeSource: "hr", load: 200.4 },
+        { date: "2026-09-30", type: "gym", minutes: 60, rpe: 6, rpeSource: "entered", load: 360 },
+        { date: "2026-10-04", type: "cross", minutes: 40, rpe: 3, rpeSource: "hr", load: 120 },
+        { date: "2026-10-05", type: "run", minutes: 30, rpe: 4, rpeSource: "entered", load: 120 },
+      ],
+      ["2026-09-21", "2026-09-28"],
+    );
+    expect(w[0]).toMatchObject({ week: "2026-09-21", total: 0, estimatedShare: null });
+    expect(w[1]).toMatchObject({ week: "2026-09-28", run: 200, gym: 360, hiit: 0, cross: 120, total: 680 });
+    expect(w[1].estimatedShare).toBeCloseTo(320.4 / 680.4);
+  });
+
+  it("estimates bike/swim RPE from HR like runs, gym from the median", () => {
+    const s = sessionLoads(
+      [
+        act({ date: "2026-09-01", type: "cross", duration_min: 40, avg_hr: 140 }),
+        act({ date: "2026-09-02", type: "gym", duration_min: 60, rpe: 7 }),
+        act({ date: "2026-09-03", type: "gym", duration_min: 60 }),
+      ],
+      anchors,
+    );
+    expect(s[0]).toMatchObject({ rpeSource: "hr", rpe: rpeFromHr(140, anchors) });
+    expect(s[2]).toMatchObject({ rpeSource: "median", rpe: 7, load: 420 });
   });
 });
 

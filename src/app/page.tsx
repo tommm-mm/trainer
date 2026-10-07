@@ -23,6 +23,9 @@ import { MuscleMeters } from "@/components/muscle-meters";
 import { TargetMeters } from "@/components/season-targets";
 import { loadSeasonWeek } from "@/lib/season/queries";
 import { weeklyActuals } from "@/lib/season/progress";
+import { loadAthlete, loadWeeks } from "@/lib/athlete";
+import { plannedLoad } from "@/lib/load";
+import { LoadMeters } from "@/components/load-meters";
 import { signOut } from "./actions";
 import { approveWeek, resolveFlag } from "./week/actions";
 import { PlanRow, type PlanTemplate } from "./week/plan-row";
@@ -99,8 +102,13 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
     loadStrength(supabase, { from: monday, to: sunday }).catch(() => null),
   ]);
 
-  // This week's targets from the approved season (Season tab).
-  const seasonWeek = goal ? await loadSeasonWeek(supabase, goal.id, monday).catch(() => null) : null;
+  // This week's targets from the approved season (Season tab), load and time in zones.
+  const [seasonWeek, weekLoad] = await Promise.all([
+    goal ? loadSeasonWeek(supabase, goal.id, monday).catch(() => null) : null,
+    loadAthlete(supabase, today)
+      .then(async (athlete) => ({ athlete, ...(await loadWeeks(supabase, athlete, [monday], today)) }))
+      .catch(() => null),
+  ]);
 
   const plans = plansRes.data ?? [];
   const activities = activitiesRes.data ?? [];
@@ -221,6 +229,21 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
           )}
           {seasonWeek.week.milestone && <p className="text-sm text-amber-300">⚑ {seasonWeek.week.milestone}</p>}
         </Link>
+      )}
+
+      {weekLoad && monday <= today && (
+        <section className={`${cardCls} mb-4`}>
+          <p className="mb-2 text-xs uppercase tracking-wide text-neutral-500">
+            {isCurrentWeek ? "Load this week" : "Load"}
+          </p>
+          <LoadMeters
+            done={weekLoad.loads.get(monday)}
+            planned={seasonWeek ? plannedLoad(seasonWeek.week, weekLoad.athlete.calibration) : null}
+            zones={weekLoad.zones.get(monday)}
+            focus={seasonWeek?.block.focus}
+            finished={sunday < today}
+          />
+        </section>
       )}
 
       {loadError && (

@@ -6,6 +6,7 @@
 
 import { addDays, daysBetween, isISODate, mondayOf } from "@/lib/dates";
 import { ACWR_SAFE } from "@/lib/metrics";
+import { plannedLoad, type LoadCalibration } from "@/lib/load";
 
 export const FOCUSES = [
   "base",
@@ -74,6 +75,8 @@ export type WeekTargets = {
   gym_sessions?: number | null;
   /** Easy bike / swim sessions (recovery, time on the legs without impact). */
   cross_sessions?: number | null;
+  /** Planned load (sRPE, AU). Null = the app's estimate from the other targets. */
+  load_target?: number | null;
   key_session?: string | null;
   milestone?: string | null;
   notes?: string | null;
@@ -121,10 +124,18 @@ export const MAX_WEEKS_WITHOUT_DELOAD = 4;
  * check only warns above half the week.
  */
 export const LONG_RUN_SHARE_MAX = 0.5;
+/**
+ * Run load may rise by the same 10% as km; small steps (≤ 100 AU, about
+ * 4 km easy) always pass. Run load catches what km misses: an added quality
+ * session at the same volume.
+ */
+export const RUN_LOAD_FREE_AU = 100;
+/** Below this average week the load ACWR isn't judged (a restart from nothing). */
+export const LOAD_ACWR_MIN_AU = 300;
 
 export type Guardrail = {
   week_start: string | null;
-  code: "ramp" | "deload" | "acwr" | "long_share" | "cap" | "race_week";
+  code: "ramp" | "deload" | "acwr" | "long_share" | "cap" | "race_week" | "load_ramp" | "load_acwr";
   message: string;
 };
 
@@ -136,11 +147,20 @@ export type GuardrailContext = {
   raceDates?: string[];
   /** The goal race; the last week should contain it. */
   goalDate?: string | null;
+  /**
+   * Load checks (skipped without it): your calibration for the planned-load
+   * estimate, and the actual load of the weeks before the season (oldest first).
+   */
+  load?: {
+    calibration: LoadCalibration;
+    history?: { week_start: string; total: number; run: number }[];
+  };
 };
 
 const LIGHT_FOCUS: Focus[] = ["taper", "recovery", "transition"];
 const isLight = (w: PlanWeek) => !!w.is_deload || LIGHT_FOCUS.includes(w.focus);
 const km = (n: number) => `${Math.round(n * 10) / 10} km`;
+const au = (n: number) => `${Math.round(n).toLocaleString("en-US")} AU`;
 
 export function guardrails(weeks: PlanWeek[], ctx: GuardrailContext = {}): Guardrail[] {
   const out: Guardrail[] = [];
@@ -152,10 +172,42 @@ export function guardrails(weeks: PlanWeek[], ctx: GuardrailContext = {}): Guard
     ...(ctx.history ?? []).map((h) => ({ km: h.run_km, light: false, race: false })),
   ];
   let streak = 0;
+  const loads = (ctx.load?.history ?? []).map((h) => ({ total: h.total, run: h.run, light: false, race: false }));
 
   for (const w of weeks) {
     const race = raceWeeks.has(w.week_start);
     const runKm = w.run_km ?? null;
+
+    if (ctx.load) {
+      const planned = plannedLoad(w, ctx.load.calibration);
+      const run = planned.estimate.run;
+      if (!isLight(w) && !race) {
+        // Ramp on run load (impact), same rule as km.
+        const recent = loads.filter((s) => !s.light && !s.race).slice(-3).map((s) => s.run);
+        const ref = recent.length ? Math.max(...recent) : null;
+        if (ref && ref > 0 && run > ref * (1 + RAMP_MAX) && run - ref > RUN_LOAD_FREE_AU) {
+          out.push({
+            week_start: w.week_start,
+            code: "load_ramp",
+            message: `Run load ${au(run)} is +${Math.round((run / ref - 1) * 100)}% on your recent high of ${au(ref)} (guide ≤ ${RAMP_MAX * 100}%).`,
+          });
+        }
+        // Projected ACWR on total load (fatigue adds up from every source).
+        const chronic = loads.slice(-4).map((s) => s.total);
+        if (chronic.length === 4) {
+          const avg = chronic.reduce((a, b) => a + b, 0) / 4;
+          const ratio = avg > 0 ? planned.total / avg : null;
+          if (ratio !== null && avg >= LOAD_ACWR_MIN_AU && ratio > ACWR_SAFE.high) {
+            out.push({
+              week_start: w.week_start,
+              code: "load_acwr",
+              message: `Projected load ACWR ${ratio.toFixed(2)}: ${au(planned.total)} vs an average week of ${au(avg)} (safe ${ACWR_SAFE.low}–${ACWR_SAFE.high}).`,
+            });
+          }
+        }
+      }
+      loads.push({ total: planned.total, run, light: isLight(w), race });
+    }
 
     if (runKm !== null && !isLight(w) && !race) {
       const recent = series.filter((s) => !s.light && !s.race).slice(-3).map((s) => s.km);
@@ -243,6 +295,7 @@ const RANGES: [keyof WeekTargets, number, number][] = [
   ["quality_sessions", 0, 7],
   ["gym_sessions", 0, 14],
   ["cross_sessions", 0, 14],
+  ["load_target", 0, 20000],
 ];
 
 export function validateSeasonDraft(draft: SeasonDraft, ctx: ValidationContext = {}): ValidationResult {
@@ -305,6 +358,7 @@ const DIFF_FIELDS = [
   "quality_sessions",
   "gym_sessions",
   "cross_sessions",
+  "load_target",
   "is_deload",
   "key_session",
   "milestone",

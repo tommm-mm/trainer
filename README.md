@@ -14,7 +14,7 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | G | Gym logger, template editor, gym Stats, Today card, live meters, auto-refresh | ✅ |
 | C1 | Season model for any goal: goal → season → blocks → weekly targets, versioned proposals, guardrails, Season page, cross-training | ✅ |
 | Coach | Cowork PT: instructions, weekly review, writes `proposed` sessions / season versions via the Supabase connector (`docs/coach/`) | ✅ |
-| L | Load = volume × intensity: planned weekly load (sRPE) per season week, load-based guardrails, time in HR zones (80/20 check) | ⏳ next |
+| L | Load = volume × intensity: planned weekly load (sRPE) per season week, load-based guardrails, load by type on Season + Week View, time in HR zones (80/20 check), SQL views for Cowork | ✅ |
 | C2 | Rules engine (pure, tested): run progression (≤10%/wk, long run share, 80/20), gym progression (double progression at RIR, sets/muscle per block), spacing & safety guards; week generator from season targets + free days | ⏳ |
 | D0 | Coach inbox: one contract any coach writes to (proposed plans + exercise targets + rationale), validated by C2, approved in the app; restricted DB access for coaches | 🟡 via SQL + brief |
 | W | Garmin wellness sync (VO₂max, HRV, resting HR, sleep, CTL/ATL) → Stats › Fitness | ⏳ |
@@ -36,6 +36,8 @@ Garmin Connect → intervals.icu (their side) → `POST /api/sync` → `activiti
 - Same-day manual gym logs → `garmin_confirmed = true`.
 - Completed gym workouts → linked to the longest same-day `gym` activity (`workouts.activity_id`); the session RPE is copied onto it.
 - Each synced workout shows a feedback card (feeling, RPE, notes). "Pain" creates a `pain_reported` flag.
+- **HR streams:** runs and bike/swim get their intervals.icu HR stream stored as a histogram (`activities.hr_hist`, seconds per bpm; `{}` = no HR). Up to 20 per sync, newest first, so history backfills over a few syncs.
+- **Settings:** each sync refreshes `athlete_settings` (rest/max HR, planned-load calibration). The threshold HR in that row is only ever set by you (Season → Efforts). Streams and settings never fail a sync.
 
 ## Gym logger (`/gym`)
 
@@ -66,7 +68,11 @@ Pure functions, unit-tested (`npm test`), shared by the Stats page and the AI co
 
 | Metric | Formula |
 |---|---|
-| Session load (sRPE) | `duration_min × RPE` (AU). Missing RPE → runs: `15 × HRR − 6` from avg HR; gym/other: your median RPE for the type; else 5 |
+| Session load (sRPE) | `duration_min × RPE` (AU). Missing RPE → runs and bike/swim: `15 × HRR − 6` from avg HR; gym/other: your median RPE for the type; else 5 |
+| Load by type | run · gym · HIIT (Garmin cardio finishers) · bike/swim; unlinked logged workouts count as gym |
+| Planned load (`src/lib/load.ts`) | per season week: `km × easy min/km × easy RPE + 25′ × (7 − easy RPE)` per quality session + `gym × usual min × usual RPE` (× 0.6 lighter week) + usual weekly HIIT (½ lighter, 0 without gym) + `bike × usual min × RPE`. Calibrated on the last 6 complete weeks (medians, ≥ 2 sessions, else defaults). `season_weeks.load_target` overrides it. Done within ±10% = on plan |
+| Time in zones (`src/lib/zones.ts`) | HR histogram binned into the Efforts bands (65 / 75 / 84 / 90% HRR). A measured threshold HR scales every edge so 84% lands on it; history re-bins |
+| 80/20 | runs + bike/swim; easy = < 75% HRR, moderate = MP (75–84%), hard = ≥ 84%; MP counts on the hard side (Seiler). ≥ 80% easy good · 70–80% amber (expected in Specific/Peak) · < 70% red; < 60′ zoned not judged |
 | HR reserve (HRR) | `(avg HR − rest) / (max − rest)`. Rest = Garmin 30-day median (fallback 46); max = max(195, intervals.icu setting, highest HR seen) |
 | ACWR | `7-day load / (28-day load / 4)`, daily; null until 28 days of history. Safe band 0.8–1.3 |
 | Monotony / strain | `mean daily load / SD` per ISO week (rest days = 0); strain = `weekly load × monotony` |
@@ -90,6 +96,9 @@ src/
   lib/sessions.ts           # suggested session types + run/gym classifier
   lib/form.ts               # FormData parsing for Server Actions
   lib/metrics.ts            # training-load metrics (pure, tested)
+  lib/load.ts               # planned load: calibration + estimate per season week (pure, tested)
+  lib/zones.ts              # HR histogram, zones, 80/20 (pure, tested)
+  lib/athlete.ts            # athlete_settings, HR streams, weekly load + zones loader
   app/checkin/              # daily check-in + body metrics, editable history
   app/analytics/            # Stats: charts (Recharts) over metrics.ts
   app/login/                # email/password sign-in (no signup)
@@ -101,7 +110,7 @@ src/
   app/goal/                 # Goal settings (active goal, new goal, history), under the Season tab
   app/season/               # Season page: proposal review, chart, races, efforts, blocks
   lib/season/               # season model, guardrails, diff, progress, efforts (pure + tested), drafts
-  components/               # bottom nav + page shell, status chip, target meters, shared classes
+  components/               # bottom nav + page shell, status chip, target + load meters, shared classes
 ```
 
 ## Season model (`/season`, `src/lib/season/`)
@@ -119,6 +128,8 @@ Goal → **season** (macrocycle, versioned) → **mesocycles** (blocks of 1–8 
 | Lighter weeks | A deload / taper / recovery week at least every 5th week (3:1 or 4:1 loading) |
 | Projected ACWR | Planned km ÷ mean of the 4 weeks before (actuals before the season) ≤ 1.3 |
 | Long-run share | ≤ 50% of the week at plan level (a 30 km long run at 60 km is ~50%; Stats keeps the 30–35% everyday guide) |
+| Run-load ramp | Planned run load ≤ +10% over the highest of the last 3 build weeks (steps ≤ 100 AU pass); catches a quality session added at the same km |
+| Projected load ACWR | Planned total load ÷ mean of the 4 weeks before (actual load before the season) ≤ 1.3; not judged under 300 AU/week |
 | Your caps | `limits`: max runs/week, max week km, max long run, max gym/week |
 | Race week | The last week contains the goal date |
 
@@ -126,7 +137,9 @@ Race weeks (goal and tune-ups) skip ramp, share and cap checks.
 - **Progress.** Done work per week: run km, runs, longest run and gym days (Garmin strength or finished workouts; HIIT doesn't count). ±6% of the km target is on target: a week is judged on totals, not on which day a run happened.
 - **Efforts.** HR bands as % of heart-rate reserve on your Garmin anchors (recovery < 65%, easy 65–75%, MP 75–84%, threshold 84–90%, intervals 90–97%); paces offset from goal marathon pace (Daniels VDOT tables). Tests in the plan replace the pace targets.
 - **Races.** The goal race is A; tune-ups live in `goals.params.tune_up_races` with priority B/C and distance, added from the Season page. Tests inside the plan (time trials) are week `milestone`s.
-- **Week View** shows the approved season's targets for the week with progress meters.
+- **Week View** shows the approved season's targets for the week with progress meters, plus the week's load by type vs plan and the 80/20 split.
+- **Load.** The Season page charts planned vs done load per week (stacked by type), the Now card adds load and 80/20 meters, each week row shows planned / done load and easy share. Week edits take a load target (blank = estimate). Migration: `supabase/migrations/20261005170000_load.sql`.
+- **Views for coaches** (read-only, `security_invoker`): `session_loads`, `weekly_load`, `season_week_load`, `weekly_zones`, `hr_zone_cuts`. Same formulas as the app, reading `athlete_settings`; Cowork reads load from them instead of recomputing (one difference: the views take the median RPE over all history, the app over the last 16 weeks).
 - **Cross-training.** Weeks carry `cross_sessions` (easy bike / swim for recovery); Garmin rides and swims sync as `cross` and fill that meter. They add load, never run km.
 - **Weekly coaching loop.** The Cowork PT follows `docs/coach/pt-brief.md`: once a week it reads the data through the Supabase connector, reviews the week, and writes next week as `proposed` `weekly_plans` rows (and, when the plan itself should change, a season proposal via `create_season_proposal`, which takes the owner from the goal so a service-role writer works). Tommaso approves both in the app.
 

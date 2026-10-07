@@ -1,8 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getActiveGoal } from "@/lib/queries";
-import { addDays, todayISO } from "@/lib/dates";
-import { fetchHrSettings } from "@/lib/intervals";
-import { resolveHrAnchors } from "@/lib/metrics";
+import { addDays, mondayOf, todayISO } from "@/lib/dates";
+import { loadAthlete, loadWeeks } from "@/lib/athlete";
 import { flattenWeeks } from "@/lib/season/model";
 import { weeklyActuals } from "@/lib/season/progress";
 import { historyBefore, loadSeasons } from "@/lib/season/queries";
@@ -24,13 +23,18 @@ export default async function SeasonPage({ searchParams }: PageProps<"/season">)
     .filter((s) => s !== null)
     .map((s) => flattenWeeks(s.blocks)[0]?.week_start ?? today)
     .sort()[0];
-  const [actsRes, workoutsRes, maxHrRes, hr, history] = await Promise.all([
+  const [actsRes, workoutsRes, athlete, history] = await Promise.all([
     supabase.from("activities").select("date, type, distance_km").gte("date", start).lte("date", today),
     supabase.from("workouts").select("date").eq("status", "completed").gte("date", start),
-    supabase.from("activities").select("max_hr").not("max_hr", "is", null).order("max_hr", { ascending: false }).limit(1),
-    fetchHrSettings(addDays(today, -30), today),
+    loadAthlete(supabase, today),
     historyBefore(supabase, start),
   ]);
+  // Load and zones from 4 weeks before the season (load ACWR seed) to this week.
+  const loadFrom = addDays(start, -28);
+  const thisMonday = mondayOf(today);
+  const loadWeekList: string[] = [];
+  for (let w = loadFrom; w <= thisMonday; w = addDays(w, 7)) loadWeekList.push(w);
+  const { loads, zones } = await loadWeeks(supabase, athlete, loadWeekList, today);
 
   return (
     <SeasonView
@@ -43,8 +47,15 @@ export default async function SeasonPage({ searchParams }: PageProps<"/season">)
         (actsRes.data ?? []).map((a) => ({ ...a, distance_km: a.distance_km === null ? null : Number(a.distance_km) })),
         (workoutsRes.data ?? []).map((w) => w.date),
       )}
-      anchors={resolveHrAnchors({ garminRest: hr.restHr, garminMax: hr.maxHr, activities: maxHrRes.data ?? [] })}
+      anchors={athlete.anchors}
+      thresholdDate={athlete.thresholdDate}
+      calibration={athlete.calibration}
       history={history}
+      loads={loads}
+      zones={zones}
+      loadHistory={loadWeekList
+        .filter((w) => w < start)
+        .map((w) => ({ week_start: w, total: loads.get(w)?.total ?? 0, run: loads.get(w)?.run ?? 0 }))}
     />
   );
 }

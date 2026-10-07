@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import type { ActionState } from "@/lib/form";
 import type { WeekTargets } from "@/lib/season/model";
 import { btnSmall, inputCls, labelCls } from "@/components/ui";
-import { addRace, updateSeasonWeek } from "./actions";
+import { addRace, setThresholdHr, updateSeasonWeek } from "./actions";
 
 export function WeekEditForm({ id, week }: { id: string; week: WeekTargets }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(updateSeasonWeek, { error: null });
@@ -31,6 +31,10 @@ export function WeekEditForm({ id, week }: { id: string; week: WeekTargets }) {
       <label className={labelCls}>
         Bike
         <input name="cross_sessions" inputMode="numeric" defaultValue={week.cross_sessions ?? ""} className={inputCls} />
+      </label>
+      <label className={`${labelCls} col-span-5`}>
+        Load target (AU, blank = estimate)
+        <input name="load_target" inputMode="numeric" defaultValue={week.load_target ?? ""} className={inputCls} />
       </label>
       <label className={`${labelCls} col-span-5`}>
         Key session
@@ -79,6 +83,28 @@ export function AddRaceForm() {
         {pending ? "Adding…" : state.ok ? "Added ✓" : "Add race"}
       </button>
       {state.error && <p className="col-span-2 text-xs text-red-400">{state.error}</p>}
+    </form>
+  );
+}
+
+/** Threshold HR from a test: re-centres the zones. Only you set it. */
+export function ThresholdForm({ threshold, date }: { threshold: number | null; date: string | null }) {
+  const [state, action, pending] = useActionState<ActionState, FormData>(setThresholdHr, { error: null });
+  return (
+    <form action={action} className="mt-2 grid grid-cols-5 gap-2">
+      <label className={`${labelCls} col-span-2`}>
+        Threshold HR
+        <input name="threshold_hr" inputMode="numeric" placeholder="e.g. 174" defaultValue={threshold ?? ""} className={inputCls} />
+      </label>
+      <label className={`${labelCls} col-span-2`}>
+        Test date
+        <input name="threshold_date" type="date" defaultValue={date ?? ""} className={inputCls} />
+      </label>
+      <button disabled={pending} className={`${btnSmall} self-end`}>
+        {pending ? "…" : state.ok ? "Saved ✓" : "Save"}
+      </button>
+      <p className="col-span-5 text-[11px] text-neutral-500">Leave the HR blank and save to go back to the default zones.</p>
+      {state.error && <p className="col-span-5 text-xs text-red-400">{state.error}</p>}
     </form>
   );
 }

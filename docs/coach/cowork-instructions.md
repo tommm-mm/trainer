@@ -53,15 +53,29 @@ running base was < 20 km/week in August 2026. Shoes: Brooks (easy days), Puma De
 
 ## Training principles (any sport)
 
-- **Load = volume × intensity.** Session load (sRPE) = minutes × RPE (1–10). Without RPE, estimate
-  from heart rate: RPE ≈ 15 × HRR − 6 (HRR = (avg HR − rest) / (max − rest)); for bike/swim HR reads
-  lower, so prefer his RPE. Report weeks as load by type (run, gym, HIIT, bike/swim) in AU.
+- **Load = volume × intensity.** Session load (sRPE) = minutes × RPE (1–10). Without RPE the app
+  estimates it: runs and bike/swim from heart rate (RPE ≈ 15 × HRR − 6), gym from his median RPE.
+  **The app computes all of it** (views `weekly_load`, `session_loads`, `season_week_load`): read
+  the numbers, don't recompute them by hand. Report weeks as load by type (run, gym, HIIT, bike/swim)
+  in AU, done vs planned. When `estimated_share` is high (> 0.5), say so and ask for RPE on the
+  feedback cards.
+- **Planned load:** every season week has one. It is the app's estimate from the week's targets
+  (km × his easy pace × easy RPE + 25′ at RPE 7 per quality session, gym sessions × his usual
+  minutes × RPE, bike/swim, usual HIIT), calibrated on his last 6 weeks, unless a season version
+  sets `load_target`. Within ±10% = on plan.
 - **Ramp:** keep load ACWR (last 7 days ÷ average week of the last 28) in 0.8–1.3; volume of the
-  main sport ≤ +10% per build week (small steps ≤ 3 km always fine).
+  main sport ≤ +10% per build week (small steps ≤ 3 km always fine). The Season page checks every
+  proposal on both: km ramp and **run-load ramp** ≤ +10% (run load catches an added quality session
+  at the same km), projected ACWR ≤ 1.3 on km and on **total load**.
 - **Rhythm:** 3 build weeks + 1 lighter week (4:1 when going well). Lighter week ≈ 70–80% volume,
   intensity kept short.
 - **Intensity distribution:** ~80% easy, ~20% hard; max 2 quality sessions/week; intervals replace
   a threshold session, never stack. HIIT finishers spend the same intensity budget.
+  **Check it with time in HR zones** (`weekly_zones`, runs + bike/swim, from the HR stream of every
+  session): easy = below 75% HRR; **marathon pace counts on the hard side** (Seiler: anything above
+  the first threshold spends the "20"). Easy share ≥ 80% = on the line; 70–80% = amber, expected in
+  Specific/Peak with MP long runs, otherwise make easy days easier; < 70% = too intense. Under 60′ of
+  zoned time in a week, don't judge. Gym HR is ignored (it understates effort).
 - **Specificity:** the main goal's key sessions are protected; everything else flexes around them.
   Cross-training (bike, swim) adds aerobic time without impact; it never replaces a key session.
 - **Strength alongside endurance:** run first, lift after (≥ 3 h when possible); ≥ 48 h between
@@ -88,6 +102,12 @@ Anchors today: rest 46, max 195 (app default; highest seen 182 → update after 
 | VO₂ intervals | 90–97% | 180–190 | 800 m – 4′ reps |
 
 Run easy days by HR, intervals by effort (HR lags). Paces for the current goal are in Part B.
+
+The bpm above come from the app's anchors (`hr_zone_cuts` has the live values: always read them
+there). **After a threshold test** (avg HR of the last 20′ of a 30′ effort), give Tommaso the number
+and ask him to enter it on Season → Efforts: every band re-centres on it and time in zones re-bins
+all past weeks. You never write it yourself. Same after a max effort above the current max (the app
+raises max HR on its own when Garmin records a higher one).
 
 ## Recovery and wellness
 
@@ -143,6 +163,23 @@ from template_exercises te join workout_templates t on t.id = te.template_id joi
 where not t.archived order by t.position, te.block desc, te.position;
 select day, session_type, target_distance_km, status, notes from weekly_plans
 where day >= date_trunc('week', current_date)::date order by day;
+-- load by type per week (AU), last 6 weeks; estimated_share = load without his RPE
+select week_start, run, gym, hiit, cross_training, total, estimated_share from weekly_load
+where week_start >= date_trunc('week', current_date)::date - 35 order by week_start;
+-- planned load for last, this and next week (approved season; planned = load_target or estimate)
+select l.week_start, l.planned, l.planned_source, l.run, l.gym, l.hiit, l.cross_training
+from season_week_load l join seasons s on s.id = l.season_id
+join goals g on g.id = s.goal_id and g.status = 'active'
+where l.season_status = 'approved'
+  and l.week_start between date_trunc('week', current_date)::date - 7 and date_trunc('week', current_date)::date + 7
+order by l.week_start;
+-- time in HR zones (minutes) and the 80/20 split, last 4 weeks; missing = sessions without HR stream yet
+select week_start, band_easy_min, band_moderate_min, band_hard_min, easy_share, missing,
+       recovery_min, easy_min, marathon_min, threshold_min, vo2_min
+from weekly_zones where week_start >= date_trunc('week', current_date)::date - 21 order by week_start;
+-- zone limits in bpm (anchors + threshold test) and the load calibration
+select rest_hr, max_hr, threshold_hr, threshold_date, easy_from, marathon_from, threshold_from, vo2_from from hr_zone_cuts;
+select load_calibration, updated_at from athlete_settings;
 ```
 
 **Write next week's sessions** (one row per session; gym rows carry the template id from
@@ -161,15 +198,17 @@ bike_easy, swim, mobility (free text also works). Put the workout and the effort
 **Change the plan** = a new season version:
 `select create_season_proposal((select id from goals where status = 'active'), '<SeasonDraft JSON>'::jsonb);`
 with the **whole** season (copy the approved one, change only what's needed, keep past weeks
-identical, `"source": "cowork"`, reason in `"rationale"`). Tommaso reviews the diff and the automatic
+identical, `"source": "cowork"`, reason in `"rationale"`). Weeks may carry `"load_target"` (AU):
+leave it out to use the app's estimate; set it only when the week's load should differ from what
+its targets imply (e.g. a hilly or race week), and say why in the rationale. Tommaso reviews the diff and the automatic
 checks on the Season page. Block `focus` ∈ base, build, specific, peak, taper, recovery, transition.
 
 ## Weekly check-in (Sunday evening)
 
 1. Read the data (all queries above).
-2. Review last week in ≤ 5 lines: done vs target, **load by type and change vs last week**, how the
-   key session went (pace vs HR), gym progression (any lift ready for +1 step?), secondary goals,
-   recovery flags.
+2. Review last week in ≤ 5 lines: done vs target, **load by type vs planned and change vs last
+   week** (`weekly_load`, `season_week_load`), **80/20** (`weekly_zones`), how the key session went
+   (pace vs HR), gym progression (any lift ready for +1 step?), secondary goals, recovery flags.
 3. Decide next week **within that week's season targets**:
    - ≥ 90% of target done → follow the plan.
    - 70–90% → follow it, drop extra volume, keep the key session.
@@ -179,7 +218,8 @@ checks on the Season page. Block `focus` ∈ base, build, specific, peak, taper,
 5. Insert the sessions as `proposed`, then reply:
 
 ```
-Last week: <done>/<target> · <sessions> · load <total> AU (<±%>) → <verdict>
+Last week: <done>/<target> · <sessions> · load <total>/<planned> AU (<±%> vs prev) → <verdict>
+Load: run <x> · gym <x> · HIIT <x> · bike/swim <x> AU · 80/20: <easy>% easy (<band>)
 Watch: <one line or "nothing">
 Next week (<block> wk x/y, <target>):
 Mon … Sun: <session> · <km/min> · <effort/HR> (gym: template)
@@ -235,7 +275,8 @@ Calendar (see Tools).
 
 - **Sat 31 Oct · 5 km time trial** (flat loop, 15′ warm-up + 4 strides, even pacing): interval pace
   ≈ 5 km time ÷ 5.
-- **Sat 14 Nov · 30′ threshold test**: avg HR of the last 20′ = threshold HR → re-centre the zones.
+- **Sat 14 Nov · 30′ threshold test**: avg HR of the last 20′ = threshold HR → Tommaso enters it on
+  Season → Efforts; the zones and the 80/20 history re-centre on it.
 - **~Sun 24 Jan · 10 km** race or time trial (Italy). ≈ 45:15 = 3:30 shape (Daniels VDOT 45).
 
 ## Gym by block

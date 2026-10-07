@@ -6,7 +6,10 @@ import { btnDanger, btnPrimary, btnSmall, cardCls } from "@/components/ui";
 import type { Tables } from "@/lib/database.types";
 import { addDays, daysBetween, formatDay, formatLongDate, formatShortDate, mondayOf } from "@/lib/dates";
 import { formatDuration, formatNumber, formatPace } from "@/lib/format";
-import { resolveHrAnchors, type HrAnchors } from "@/lib/metrics";
+import { resolveHrAnchors, type HrAnchors, type WeekLoad } from "@/lib/metrics";
+import { DEFAULT_CALIBRATION, plannedLoad, type LoadCalibration, type PlannedLoad } from "@/lib/load";
+import type { ZoneWeek } from "@/lib/zones";
+import { LoadMeters } from "@/components/load-meters";
 import type { RaceParams } from "@/lib/domain";
 import {
   FOCUS_COLORS,
@@ -28,7 +31,8 @@ import { starterDraftFor } from "@/lib/season/drafts";
 import { ActionButton } from "@/app/goal/goal-forms";
 import { approveSeason, proposeStarterSeason, rejectSeason, removeRace } from "./actions";
 import { SeasonChart } from "./season-chart";
-import { AddRaceForm, WeekEditForm } from "./forms";
+import { LoadChart } from "./load-chart";
+import { AddRaceForm, ThresholdForm, WeekEditForm } from "./forms";
 
 export function SeasonView({
   today,
@@ -38,7 +42,12 @@ export function SeasonView({
   view,
   actuals = new Map(),
   anchors = resolveHrAnchors({ activities: [] }),
+  thresholdDate = null,
+  calibration = DEFAULT_CALIBRATION,
   history = [],
+  loads = new Map(),
+  zones = new Map(),
+  loadHistory = [],
 }: {
   today: string;
   goal: Tables<"goals"> | null;
@@ -46,8 +55,13 @@ export function SeasonView({
   proposed: LoadedSeason | null;
   view?: "proposed";
   actuals?: Map<string, WeekActual>;
-  anchors?: HrAnchors;
+  anchors?: HrAnchors & { threshold?: number | null };
+  thresholdDate?: string | null;
+  calibration?: LoadCalibration;
   history?: { week_start: string; run_km: number }[];
+  loads?: Map<string, WeekLoad>;
+  zones?: Map<string, ZoneWeek>;
+  loadHistory?: { week_start: string; total: number; run: number }[];
 }) {
   const thisMonday = mondayOf(today);
 
@@ -81,6 +95,7 @@ export function SeasonView({
   const weeks = flattenWeeks(shown.blocks);
   const start = weeks[0].week_start;
   const doneKm = new Map([...actuals].map(([k, v]) => [k, v.run_km]));
+  const planned = new Map(weeks.map((w) => [w.week_start, plannedLoad(w, calibration)]));
   const position = currentPosition(shown.blocks, today);
   const p = (goal.params ?? {}) as RaceParams;
   const mp = p.target_time_seconds && p.distance_km ? Math.round(p.target_time_seconds / p.distance_km) : null;
@@ -98,6 +113,7 @@ export function SeasonView({
             history,
             raceDates,
             goalDate: goal.target_date,
+            load: { calibration, history: loadHistory },
           })}
           goalDate={goal.target_date}
         />
@@ -115,7 +131,14 @@ export function SeasonView({
       )}
 
       {position && shown.status === "approved" && (
-        <NowCard season={shown} position={position} actual={actuals.get(thisMonday)} />
+        <NowCard
+          season={shown}
+          position={position}
+          actual={actuals.get(thisMonday)}
+          load={loads.get(thisMonday)}
+          planned={planned.get(thisMonday) ?? null}
+          zones={zones.get(thisMonday)}
+        />
       )}
 
       <section className={cardCls}>
@@ -128,13 +151,20 @@ export function SeasonView({
         <SeasonChart weeks={weeks} done={doneKm} thisMonday={thisMonday} goalMonday={goalMonday} />
       </section>
 
+      <section className={cardCls}>
+        <p className="mb-2 text-xs uppercase tracking-wide text-neutral-500">Load · planned vs done (AU)</p>
+        <LoadChart weeks={weeks} planned={planned} done={loads} thisMonday={thisMonday} />
+        <p className="mt-2 text-xs text-neutral-500">
+          Load = minutes × effort (RPE). Planned load is estimated from each week&apos;s targets and your last{" "}
+          {calibration.weeks || "few"} weeks (easy {formatPace(calibration.easy_min_per_km * 60)}/km at RPE{" "}
+          {calibration.easy_rpe}, gym {calibration.gym_min}′ at RPE {calibration.gym_rpe}), unless a coach set a
+          target. Within ±10% counts as on plan.
+        </p>
+      </section>
+
       <RacesCard races={races} season={shown} today={today} />
 
-      <EffortsCard
-        rows={effortTable(anchors, mp)}
-        anchors={anchors}
-        mp={mp}
-      />
+      <EffortsCard rows={effortTable(anchors, mp)} anchors={anchors} thresholdDate={thresholdDate} mp={mp} />
 
       <section id="blocks" className="flex scroll-mt-4 flex-col gap-2">
         <h2 className="text-sm font-semibold text-neutral-300">Blocks</h2>
@@ -144,6 +174,9 @@ export function SeasonView({
             block={b}
             current={position?.blockIndex === i}
             actuals={actuals}
+            loads={loads}
+            zones={zones}
+            planned={planned}
             thisMonday={thisMonday}
             editable={shown.status === "approved" || shown.status === "proposed"}
           />
@@ -311,8 +344,8 @@ function ProposalCard({
         <p className="mb-1 text-xs uppercase tracking-wide text-neutral-500">Automatic checks</p>
         {warnings.length === 0 ? (
           <p className="text-sm text-emerald-300">
-            ✓ All pass: ramp ≤ 10%, a lighter week at least every 4, projected ACWR ≤ 1.3, long run ≤ 50% of the week,
-            your caps.
+            ✓ All pass: ramp ≤ 10% (km and run load), a lighter week at least every 4, projected ACWR ≤ 1.3 (km and
+            total load), long run ≤ 50% of the week, your caps.
           </p>
         ) : (
           <ul className="flex flex-col gap-1 text-sm">
@@ -359,10 +392,16 @@ function NowCard({
   season,
   position,
   actual,
+  load,
+  planned,
+  zones,
 }: {
   season: LoadedSeason;
   position: NonNullable<ReturnType<typeof currentPosition>>;
   actual: WeekActual | undefined;
+  load: WeekLoad | undefined;
+  planned: PlannedLoad | null;
+  zones: ZoneWeek | undefined;
 }) {
   const block = season.blocks[position.blockIndex];
   const w = position.week;
@@ -376,6 +415,7 @@ function NowCard({
         {block.purpose && <p className="mt-1 text-sm text-neutral-300">{block.purpose}</p>}
       </div>
       <TargetMeters targets={w} actual={actual} finished={false} />
+      <LoadMeters done={load} planned={planned} zones={zones} focus={block.focus} finished={false} />
       {w.key_session && <p className="text-sm">Key: {w.key_session}</p>}
       {w.milestone && <p className="text-sm text-amber-300">⚑ {w.milestone}</p>}
       <p className="text-xs text-neutral-500">
@@ -460,10 +500,12 @@ function RacesCard({
 function EffortsCard({
   rows,
   anchors,
+  thresholdDate,
   mp,
 }: {
   rows: ReturnType<typeof effortTable>;
-  anchors: ReturnType<typeof resolveHrAnchors>;
+  anchors: HrAnchors & { threshold?: number | null };
+  thresholdDate: string | null;
   mp: number | null;
 }) {
   return (
@@ -505,6 +547,12 @@ function EffortsCard({
         not pace. Intervals: run by effort, HR lags on short repeats. Bike / swim: easy only (RPE 3–4 of 10); on the
         bike HR sits about 5–10 bpm lower than running at the same effort.
       </p>
+      <p className="mt-2 text-xs text-neutral-500">
+        {anchors.threshold
+          ? `Re-centred on your threshold HR ${anchors.threshold}${thresholdDate ? ` (test of ${formatLongDate(thresholdDate)})` : ""}: every band moves so threshold starts there. Time in zones re-bins all past weeks the same way.`
+          : "After a threshold test (avg HR of the last 20′ of a 30′ effort), enter it here: the bands re-centre on it and time in zones re-bins all past weeks."}
+      </p>
+      <ThresholdForm threshold={anchors.threshold ?? null} date={thresholdDate} />
     </details>
   );
 }
@@ -513,12 +561,18 @@ function BlockCard({
   block,
   current,
   actuals,
+  loads,
+  zones,
+  planned,
   thisMonday,
   editable,
 }: {
   block: LoadedSeason["blocks"][number];
   current: boolean;
   actuals: Map<string, WeekActual>;
+  loads: Map<string, WeekLoad>;
+  zones: Map<string, ZoneWeek>;
+  planned: Map<string, PlannedLoad>;
   thisMonday: string;
   editable: boolean;
 }) {
@@ -567,6 +621,7 @@ function BlockCard({
                     {w.cross_sessions ? ` · ${w.cross_sessions} bike` : ""}
                   </span>
                 </div>
+                <LoadLine planned={planned.get(w.week_start)} done={past || now ? loads.get(w.week_start) : undefined} zones={past || now ? zones.get(w.week_start) : undefined} />
                 {w.key_session && <p className="ml-16 text-xs text-neutral-400">{w.key_session}</p>}
                 {w.milestone && <p className="ml-16 text-xs text-amber-300">⚑ {w.milestone}</p>}
                 {w.notes && <p className="ml-16 text-xs text-neutral-500">{w.notes}</p>}
@@ -582,5 +637,18 @@ function BlockCard({
         </ul>
       </div>
     </details>
+  );
+}
+
+/** One line per week: planned load, done load and the easy share. */
+function LoadLine({ planned, done, zones }: { planned?: PlannedLoad; done?: WeekLoad; zones?: ZoneWeek }) {
+  if (!planned?.total && !done?.total) return null;
+  const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n)));
+  return (
+    <p className="ml-16 text-xs tabular-nums text-neutral-500">
+      Load {planned?.total ? `${planned.source === "estimate" ? "~" : ""}${k(planned.total)}` : "–"} AU
+      {done?.total ? <span className="text-emerald-400"> · {k(done.total)} done</span> : null}
+      {zones?.easyShare != null && zones.minutes >= 30 ? ` · ${Math.round(zones.easyShare * 100)}% easy` : null}
+    </p>
   );
 }

@@ -4,6 +4,7 @@
 
 import type { TablesInsert } from "@/lib/database.types";
 import { paceFromRun } from "@/lib/format";
+import { histogramFromStream, type HrHistogram } from "@/lib/zones";
 
 const BASE_URL = "https://intervals.icu/api/v1";
 // Not a secret (it's in the intervals.icu profile URL); env var overrides it.
@@ -93,6 +94,26 @@ export async function fetchActivities(oldest: string, newest: string) {
     throw new Error(`intervals.icu responded ${res.status}: ${(await res.text()).slice(0, 200)}`);
   }
   return (await res.json()) as IntervalsActivity[];
+}
+
+type IntervalsStream = { type?: string; data?: (number | null)[] | null };
+
+/**
+ * The HR stream of one activity as a histogram (seconds per bpm). Null when
+ * the activity has no HR stream. Throws on HTTP errors so the caller retries
+ * on the next sync instead of marking the activity as stream-less.
+ */
+export async function fetchHrHistogram(activityId: string): Promise<HrHistogram | null> {
+  const url = `${BASE_URL}/activity/${encodeURIComponent(activityId)}/streams.json?types=time,heartrate`;
+  const res = await fetch(url, { headers: authHeaders(), cache: "no-store" });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`intervals.icu streams ${activityId}: ${res.status} ${(await res.text()).slice(0, 120)}`);
+  }
+  const streams = (await res.json()) as IntervalsStream[];
+  const hr = streams.find((s) => s.type === "heartrate")?.data;
+  const time = streams.find((s) => s.type === "time")?.data;
+  return hr?.length ? histogramFromStream(hr, time ?? null) : null;
 }
 
 type IntervalsAthlete = {

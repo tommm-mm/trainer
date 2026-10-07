@@ -110,11 +110,27 @@ export function medianRpeByType(activities: ActivityInput[]): Record<string, num
 }
 
 /**
- * sRPE per session = duration_min × RPE. When RPE is missing (tiered fallback):
+ * RPE of one session, tiered when it wasn't entered:
  *   1. entered — the RPE from the feedback card / log form
- *   2. hr      — runs with avg HR: estimated from % heart-rate reserve
+ *   2. hr      — runs and bike/swim with avg HR: estimated from % heart-rate reserve
  *   3. median  — your median entered RPE for that type (gym, or no HR)
  *   4. default — DEFAULT_RPE
+ */
+export function sessionRpe(
+  a: ActivityInput,
+  anchors: HrAnchors,
+  medians: Record<string, number>,
+): { rpe: number; rpeSource: RpeSource } {
+  if (a.rpe != null) return { rpe: a.rpe, rpeSource: "entered" };
+  if ((a.type === "run" || a.type === "cross") && a.avg_hr) {
+    return { rpe: rpeFromHr(a.avg_hr, anchors), rpeSource: "hr" };
+  }
+  if (medians[a.type] != null) return { rpe: medians[a.type], rpeSource: "median" };
+  return { rpe: DEFAULT_RPE, rpeSource: "default" };
+}
+
+/**
+ * sRPE per session = duration_min × RPE (see `sessionRpe` for missing RPE).
  * Sessions without a duration carry no load and are dropped.
  */
 export function sessionLoads(activities: ActivityInput[], anchors: HrAnchors): SessionLoad[] {
@@ -123,21 +139,7 @@ export function sessionLoads(activities: ActivityInput[], anchors: HrAnchors): S
   for (const a of activities) {
     const minutes = a.duration_min ?? 0;
     if (minutes <= 0) continue;
-    let rpe: number;
-    let rpeSource: RpeSource;
-    if (a.rpe != null) {
-      rpe = a.rpe;
-      rpeSource = "entered";
-    } else if ((a.type === "run" || a.type === "cross") && a.avg_hr) {
-      rpe = rpeFromHr(a.avg_hr, anchors);
-      rpeSource = "hr";
-    } else if (medians[a.type] != null) {
-      rpe = medians[a.type];
-      rpeSource = "median";
-    } else {
-      rpe = DEFAULT_RPE;
-      rpeSource = "default";
-    }
+    const { rpe, rpeSource } = sessionRpe(a, anchors, medians);
     out.push({ date: a.date, type: a.type, minutes, rpe, rpeSource, load: minutes * rpe });
   }
   return out;
@@ -150,27 +152,79 @@ export function estimatedLoadShare(sessions: SessionLoad[]): number | null {
   return sum(sessions.filter((s) => s.rpeSource !== "entered").map((s) => s.load)) / total;
 }
 
+// ---------------------------------------------------------------- load by type
+
+/**
+ * Load buckets: run, gym (strength), HIIT (Garmin "cardio" finishers) and
+ * bike/swim ("cross"). Fatigue adds up from all of them; impact only from runs.
+ */
+export const LOAD_TYPES = ["run", "gym", "hiit", "cross"] as const;
+export type LoadType = (typeof LOAD_TYPES)[number];
+
+export const LOAD_TYPE_LABELS: Record<LoadType, string> = {
+  run: "Run",
+  gym: "Gym",
+  hiit: "HIIT",
+  cross: "Bike/swim",
+};
+
+/** Activity type → load bucket. Anything unknown counts with the gym. */
+export function loadType(activityType: string): LoadType {
+  if (activityType === "run") return "run";
+  if (activityType === "cardio") return "hiit";
+  if (activityType === "cross") return "cross";
+  return "gym";
+}
+
+export type ByType = Record<LoadType, number>;
+export const emptyByType = (): ByType => ({ run: 0, gym: 0, hiit: 0, cross: 0 });
+
 // ---------------------------------------------------------------- daily load
 
-export type DailyLoad = { date: string; run: number; gym: number; total: number };
+export type DailyLoad = { date: string; total: number } & ByType;
 
 /** One row per calendar day from `from` to `to` inclusive; rest days are 0. */
 export function dailyLoads(sessions: SessionLoad[], from: string, to: string): DailyLoad[] {
   const n = daysBetween(from, to) + 1;
   const days: DailyLoad[] = Array.from({ length: Math.max(0, n) }, (_, i) => ({
     date: addDays(from, i),
-    run: 0,
-    gym: 0,
+    ...emptyByType(),
     total: 0,
   }));
   for (const s of sessions) {
     const i = daysBetween(from, s.date);
     if (i < 0 || i >= days.length) continue;
-    if (s.type === "run") days[i].run += s.load;
-    else days[i].gym += s.load;
+    days[i][loadType(s.type)] += s.load;
     days[i].total += s.load;
   }
   return days;
+}
+
+// ---------------------------------------------------------------- weekly load
+
+export type WeekLoad = ByType & {
+  week: string; // Monday
+  total: number;
+  /** Share of the week's load whose RPE was estimated (0–1), null with no load. */
+  estimatedShare: number | null;
+};
+
+/** Load per ISO week and type for the given Mondays (rounded to whole AU). */
+export function weeklyLoads(sessions: SessionLoad[], weeks: string[]): WeekLoad[] {
+  const byWeek = new Map(weeks.map((w) => [w, [] as SessionLoad[]]));
+  for (const s of sessions) byWeek.get(mondayOf(s.date))?.push(s);
+  return weeks.map((week) => {
+    const list = byWeek.get(week)!;
+    const t = emptyByType();
+    for (const s of list) t[loadType(s.type)] += s.load;
+    for (const k of LOAD_TYPES) t[k] = Math.round(t[k]);
+    return {
+      week,
+      ...t,
+      total: t.run + t.gym + t.hiit + t.cross,
+      estimatedShare: estimatedLoadShare(list),
+    };
+  });
 }
 
 // ---------------------------------------------------------------- ACWR
