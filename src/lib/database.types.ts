@@ -90,6 +90,36 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["athlete_settings"]["Insert"]>
         Relationships: []
       }
+      coach_proposals: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          dedupe_key: string | null
+          id: string
+          kind: string
+          payload: Json
+          rationale: string | null
+          source: string
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          dedupe_key?: string | null
+          id?: string
+          kind: string
+          payload: Json
+          rationale?: string | null
+          source?: string
+          status?: string
+          title: string
+          user_id?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["coach_proposals"]["Insert"]>
+        Relationships: []
+      }
       body_metrics: {
         Row: {
           body_fat_pct: number | null
@@ -739,6 +769,7 @@ export type Database = {
       }
     }
     Functions: {
+      apply_coach_proposal: { Args: { p_id: string }; Returns: undefined }
       approve_season: { Args: { p_season_id: string }; Returns: undefined }
       create_season_proposal: { Args: { p_goal_id: string; p_draft: Json }; Returns: string }
       is_muscle_list: { Args: { m: string[] }; Returns: boolean }

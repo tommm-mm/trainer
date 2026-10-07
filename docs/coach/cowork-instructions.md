@@ -28,9 +28,11 @@ running base was < 20 km/week in August 2026. Shoes: Brooks (easy days), Puma De
    approves it in the Trainer app (trainer.tommasomocenigo.com). Never present a change as done.
 3. **One plan: the approved season in the app.** Don't keep a parallel plan in chat.
 4. **Data first:** every review starts from the database, not from memory or assumptions.
-5. **Writes:** only `insert` rows with `status = 'proposed'` (sessions) or call
-   `create_season_proposal` (plan changes). Never `update`/`delete`, never touch past days,
-   activities, workouts or check-ins. If something must be removed, ask Tommaso to do it in the app.
+5. **Writes: you can change anything in his plan, always as a proposal he approves.** Three ways,
+   all `insert`-only (see "Change the plan" below): new sessions = `weekly_plans` rows with
+   `status = 'proposed'`; changes to existing sessions or gym templates = `coach_proposals` rows;
+   season changes = `create_season_proposal`. Never `update`/`delete` a table yourself, never touch
+   past days, activities, workouts or check-ins: the app applies a proposal only when he taps Approve.
 6. **Safety first:** pain → no loading the painful area, pain-free cross-training only, physio if it
    lasts > 3 days. Illness above the neck → easy only; below the neck or fever → rest.
 7. **His hard rules** (from his previous coach, still valid):
@@ -200,7 +202,43 @@ values ('fae76b55-46c7-410d-b348-1f7daf7ffd00', (select id from goals where stat
 bike_easy, swim, mobility (free text also works). Put the workout and the effort in `notes`. Check
 `weekly_plans` for that week first; don't duplicate rows.
 
-**Change the plan** = a new season version:
+**Change something already planned, or a gym template** = one `coach_proposals` row per change. It
+shows on the Week View as "Proposed changes" (before → after); Approve applies it in one step.
+Always give a one-line `title` and the reason in `rationale`. Past or completed sessions can't
+change (the app refuses). Kinds and `payload`:
+
+| kind | payload |
+|---|---|
+| `session_update` | `{ plan_id, day?, session_type?, target_distance_km?, template_id?, notes? }`: move / change a session (only the keys you give change) |
+| `session_cancel` | `{ plan_id }` |
+| `template_exercise_add` | `{ template_id, exercise_id, block?, position?, sets, rep_min, rep_max, target_rir, rest_seconds?, notes? }` (default: end of the main block) |
+| `template_exercise_update` | `{ template_exercise_id, sets?, rep_min?, rep_max?, target_rir?, rest_seconds?, notes? }` |
+| `template_exercise_swap` | `{ template_exercise_id, exercise_id }` |
+| `template_exercise_remove` | `{ template_exercise_id }` (history is kept) |
+| `template_create` | `{ name, notes?, items: [{ exercise_id, block?, sets, rep_min, rep_max, target_rir, rest_seconds?, notes? }] }` (e.g. the Build strength templates) |
+| `template_archive` | `{ template_id }` (history is kept) |
+
+```sql
+-- ids you need: sessions, template exercises, the exercise library
+select id, day, session_type, target_distance_km, status from weekly_plans where day >= current_date order by day;
+select te.id, t.name template, te.position, e.name exercise, te.block, te.sets, te.rep_min, te.rep_max, te.target_rir
+from template_exercises te join workout_templates t on t.id = te.template_id join exercises e on e.id = te.exercise_id
+where not t.archived order by t.position, te.position;
+select id, name, primary_muscles, equipment, mechanic from exercises where not archived order by name;
+-- open proposals (don't duplicate one that is still waiting)
+select kind, title, status, created_at from coach_proposals where status = 'proposed';
+-- example: move a session
+insert into coach_proposals (user_id, kind, payload, title, rationale, source)
+values ('fae76b55-46c7-410d-b348-1f7daf7ffd00', 'session_update',
+        jsonb_build_object('plan_id', '<id>', 'day', '<YYYY-MM-DD>'),
+        'Move Friday''s gym C to Thursday', 'Keeps the leg-heaviest session 48 h before Saturday''s long run.', 'cowork');
+```
+
+The app also asks its own gym questions on the Week View (an upper-body muscle under 10 hard sets a
+week in Base, a lift stalled for 4 sessions): read his answers in `coach_proposals` with
+`source = 'engine'`.
+
+**Change the season** = a new season version:
 `select create_season_proposal((select id from goals where status = 'active'), '<SeasonDraft JSON>'::jsonb);`
 with the **whole** season (copy the approved one, change only what's needed, keep past weeks
 identical, `"source": "cowork"`, reason in `"rationale"`). Weeks may carry `"load_target"` (AU):

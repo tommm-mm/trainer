@@ -19,9 +19,9 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | C2a | Week checks: spacing & safety rules on the Week View (warn only, red = safety, amber = rest) | ✅ |
 | C2c | Gym block periodization in the logger: deload (any block), +1 set / last set to RIR 0 (hypertrophy blocks), from the approved season | ✅ |
 | C2c+ | Strength / maintenance templates and rep ranges for Build (30 Nov) and later blocks | ⏳ |
-| C2d | Volume gaps and stalls → question cards (add / swap an exercise: always asked, never applied) | ⏳ next |
+| C2d | Gym questions on the Week View: upper-body volume gaps (< 10 hard sets/week in hypertrophy blocks) and stalled lifts (4 sessions, ≥ 3 weeks) → add / swap an exercise, only on Yes | ✅ |
 | C2e | Week generator from season targets + free days (with D1) | ⏳ |
-| D0 | Coach inbox: one contract any coach writes to (proposed plans + exercise targets + rationale), validated by C2, approved in the app; restricted DB access for coaches | 🟡 via SQL + brief |
+| D0 | Coach inbox (`coach_proposals`): Cowork can propose any change (move / change / cancel a session, add / swap / change / remove a template exercise, new or archived templates), approved on the Week View, applied atomically by `apply_coach_proposal` | ✅ (restricted DB role for coaches: later) |
 | W | Garmin wellness sync (VO₂max, HRV, resting HR, sleep, CTL/ATL) → Stats › Fitness | ⏳ |
 | D1 | AI planner (Claude API): season, blocks and weekly plan with reasons; Regenerate with a reason | ⏳ |
 | D2 | Flexible week (sessions by priority, reshuffle when life happens) + weekly coach review with memory | ⏳ |
@@ -57,6 +57,12 @@ Schema: `exercises` (starter library with `user_id` NULL + your own), `workout_t
 - **Templates** (`/gym/templates`): sets × rep range @ RIR, rest, main/finisher per exercise. Week View gym plans can point at one (Start workout); finishing completes the plan.
 - **Live:** `LiveRefresh` (in `PageShell`) listens to Supabase Realtime on `activities`, `weekly_plans`, `exercise_targets`, `checkins` and finished `workouts`, and refreshes the screen; muscle meters in the logger include the workout in progress.
 - **Today card** (Week View): rule-based suggestion (`src/lib/gym/today.ts`: plan first, next template in rotation, 48 h between full-body sessions) until the AI coach plans the week.
+
+## Coach inbox (`coach_proposals`, `src/lib/coach/`)
+
+Every change a coach wants to make to things that already exist goes through one table. A coach only **inserts** a `proposed` row (`kind`, `payload`, `title`, `rationale`, `source`); the Week View shows it as "Proposed changes" with before → after; **Approve** calls `apply_coach_proposal(id)`, which applies it in one transaction (RLS still applies; past or completed sessions never change), **Reject** keeps everything. Kinds: `session_update`, `session_cancel`, `template_exercise_add` / `_update` / `_swap` / `_remove`, `template_create`, `template_archive` (payloads in the migration header and in the Cowork instructions). New sessions stay plain `proposed` `weekly_plans` rows; season changes stay `create_season_proposal`. Migration: `supabase/migrations/20261007120000_coach_proposals.sql`.
+
+The app's own **gym questions** (`src/lib/gym/questions.ts`, C2d) use the same table: Yes inserts the change as `source = 'engine'` and applies it; No stores it rejected, and the same question (`dedupe_key`) isn't asked again for 4 weeks.
 
 ## Week checks (`src/lib/week-checks.ts`)
 
