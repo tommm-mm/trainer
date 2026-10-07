@@ -21,7 +21,9 @@ import {
   type HistoryRow,
   type Store,
   type TemplateInput,
+  acceptAllAdvice,
 } from "@/lib/gym/workout";
+import { pendingAdvice } from "@/lib/gym/progression";
 import { ExerciseCard } from "./exercise-card";
 import { ExercisePicker } from "./exercise-picker";
 import { FinishSheet } from "./finish-sheet";
@@ -327,6 +329,13 @@ function ActiveWorkout({
   }
 
   const totalSets = doc.exercises.reduce((n, e) => n + e.sets.filter((s) => !s.isWarmup).length, 0);
+  const pending = Object.fromEntries(
+    doc.exercises.flatMap((e) => {
+      const a = pendingAdvice(e, lastTime[e.exerciseId], byId.get(e.exerciseId)?.measure ?? "reps");
+      return a ? [[e.id, a] as const] : [];
+    }),
+  );
+  const pendingCount = Object.keys(pending).length;
 
   return (
     <div className="flex flex-col gap-3 pb-24">
@@ -348,6 +357,20 @@ function ActiveWorkout({
 
       {doc.exercises.length === 0 && (
         <p className="py-6 text-center text-sm text-neutral-500">No exercises yet. Add one below.</p>
+      )}
+
+      {pendingCount > 1 && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-sky-500/30 bg-sky-500/5 px-4 py-2 text-sm">
+          <span className="text-neutral-300">
+            {pendingCount} suggestions from last time · you choose the weights
+          </span>
+          <button
+            onClick={() => update((s) => acceptAllAdvice(s, pending))}
+            className="h-9 shrink-0 rounded-lg border border-sky-500/50 px-3 text-xs font-semibold text-sky-200"
+          >
+            Accept all
+          </button>
+        </div>
       )}
 
       {doc.exercises.map((ex, i) => (

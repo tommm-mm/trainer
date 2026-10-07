@@ -6,6 +6,8 @@
 
 import type { Tables } from "@/lib/database.types";
 import type { StrengthSession } from "@/lib/strength";
+import { mondayOf } from "@/lib/dates";
+import { WEIGHT_LABELS, type Advice } from "./progression";
 
 export type Block = "main" | "finisher";
 export type Measure = "reps" | "time";
@@ -47,6 +49,8 @@ export type LocalExercise = {
   block: Block;
   target: Target | null;
   sets: LocalSet[];
+  /** Your decision on the progression suggestion (absent = not decided yet). */
+  advice?: { advice: Advice; status: "accepted" | "ignored" } | null;
 };
 
 export type WorkoutStatus = "in_progress" | "completed" | "discarded";
@@ -153,6 +157,41 @@ function mapExercise(
     ...store.doc,
     exercises: store.doc.exercises.map((e) => (e.id === weId ? f(e) : e)),
   });
+}
+
+// ---------------------------------------------------------------- progression advice
+
+/** Accept or ignore the suggestion for one exercise. Accepting sets its target to the advice. */
+export function decideAdvice(
+  store: Store,
+  weId: string,
+  advice: Advice,
+  status: "accepted" | "ignored",
+): Store {
+  return mapExercise(store, weId, (e) => ({
+    ...e,
+    advice: { advice, status },
+    target:
+      status === "accepted"
+        ? {
+            sets: advice.sets,
+            repMin: advice.repMin,
+            repMax: advice.repMax,
+            rir: advice.rir,
+            restSeconds: e.target?.restSeconds ?? null,
+          }
+        : e.target,
+  }));
+}
+
+/** "Accept all": every undecided suggestion in one edit (one rev bump). */
+export function acceptAllAdvice(store: Store, advice: Record<string, Advice>): Store {
+  let next = store;
+  for (const [weId, a] of Object.entries(advice)) {
+    const ex = next.doc.exercises.find((e) => e.id === weId);
+    if (ex && !ex.advice) next = decideAdvice(next, weId, a, "accepted");
+  }
+  return next === store ? store : { ...next, rev: store.rev + 1 };
 }
 
 // ---------------------------------------------------------------- sets
@@ -312,6 +351,18 @@ export type SyncRows = {
     is_warmup: boolean;
     logged_at: string;
   }[];
+  /** Accepted suggestions, kept as approved per-week targets (what you took on, for the coach). */
+  targets: {
+    template_exercise_id: string;
+    week_start: string;
+    sets: number;
+    rep_min: number;
+    rep_max: number;
+    target_rir: number | null;
+    source: "engine";
+    status: "approved";
+    rationale: string;
+  }[];
   deleted: Store["deleted"];
 };
 
@@ -352,6 +403,23 @@ export function toRows(store: Store, now: string): SyncRows {
         is_warmup: s.isWarmup,
         logged_at: s.loggedAt,
       })),
+    ),
+    targets: d.exercises.flatMap((e) =>
+      e.advice?.status === "accepted" && e.templateExerciseId
+        ? [
+            {
+              template_exercise_id: e.templateExerciseId,
+              week_start: mondayOf(d.date),
+              sets: e.advice.advice.sets,
+              rep_min: e.advice.advice.repMin,
+              rep_max: e.advice.advice.repMax,
+              target_rir: e.advice.advice.rir,
+              source: "engine" as const,
+              status: "approved" as const,
+              rationale: `${WEIGHT_LABELS[e.advice.advice.weight]} · ${e.advice.advice.reason}`,
+            },
+          ]
+        : [],
     ),
     deleted: store.deleted,
   };
@@ -410,9 +478,11 @@ export const DEFAULT_SECONDS = 30;
  * 1. the previous set of this exercise today (same weight/reps/RIR/warm-up state), else
  * 2. the first working set from last time, else
  * 3. the template target (top of the rep range, target RIR), else defaults.
+ * An accepted progression suggestion starts 2. from the weight it was judged at
+ * (the back-off weight, not a top set) and its reps to aim for.
  */
 export function suggestNextSet(
-  ex: Pick<LocalExercise, "sets" | "target">,
+  ex: Pick<LocalExercise, "sets" | "target" | "advice">,
   last: LastTime | undefined,
   measure: Measure,
 ): SetInput {
@@ -429,10 +499,13 @@ export function suggestNextSet(
   const working = last?.sets.filter((s) => !s.is_warmup) ?? [];
   const match = working[0];
   const targetRir = ex.target?.rir ?? null;
+  // An accepted suggestion sets the reps to aim for; the weight stays yours.
+  const accepted = ex.advice?.status === "accepted" ? ex.advice.advice : null;
+  const aim = accepted?.aimReps ?? null;
   if (match) {
     return {
-      weightKg: match.weight_kg,
-      reps: measure === "reps" ? (match.reps ?? DEFAULT_REPS) : null,
+      weightKg: accepted?.basisKg ?? match.weight_kg,
+      reps: measure === "reps" ? (aim ?? match.reps ?? DEFAULT_REPS) : null,
       durationS: measure === "time" ? (match.duration_s ?? DEFAULT_SECONDS) : null,
       rir: targetRir ?? match.rir,
       isWarmup: false,
@@ -440,7 +513,7 @@ export function suggestNextSet(
   }
   return {
     weightKg: 0,
-    reps: measure === "reps" ? (ex.target?.repMax ?? DEFAULT_REPS) : null,
+    reps: measure === "reps" ? (aim ?? ex.target?.repMax ?? DEFAULT_REPS) : null,
     durationS: measure === "time" ? DEFAULT_SECONDS : null,
     rir: targetRir,
     isWarmup: false,

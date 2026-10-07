@@ -13,6 +13,7 @@ import {
   restSecondsFor,
   suggestNextSet,
   updateSet,
+  decideAdvice,
   type ExerciseInfo,
   type LastTime,
   type LocalExercise,
@@ -20,6 +21,7 @@ import {
   type Store,
 } from "@/lib/gym/workout";
 import { formatShortDate } from "@/lib/dates";
+import { pendingAdvice, WEIGHT_LABELS, type Advice } from "@/lib/gym/progression";
 
 type Props = {
   ex: LocalExercise;
@@ -60,6 +62,11 @@ export function ExerciseCard(p: Props) {
               Last: {last.sets.filter((s) => !s.is_warmup).map((s) => formatSet(s, measure)).join(" · ")}
             </p>
           )}
+          {!p.open && pendingAdvice(ex, last, measure) && (
+            <p className="truncate text-xs text-sky-300">
+              Suggested: {WEIGHT_LABELS[pendingAdvice(ex, last, measure)!.weight]}
+            </p>
+          )}
         </div>
         <span className="shrink-0 text-sm tabular-nums text-neutral-400">
           {prog.done}
@@ -86,6 +93,7 @@ function OpenBody({
   const [editing, setEditing] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const suggested = suggestNextSet(ex, last, measure);
+  const advice = pendingAdvice(ex, last, measure);
   const editingSet = ex.sets.find((s) => s.id === editing) ?? null;
   const t = ex.target;
   const targetText = t
@@ -126,6 +134,19 @@ function OpenBody({
           ⋯
         </button>
       </div>
+
+      {advice && (
+        <AdviceBox
+          advice={advice}
+          onAccept={() => update((s) => decideAdvice(s, ex.id, advice, "accepted"))}
+          onIgnore={() => update((s) => decideAdvice(s, ex.id, advice, "ignored"))}
+        />
+      )}
+      {ex.advice?.status === "accepted" && (
+        <p className="text-xs text-sky-300">
+          ✓ Plan: aim {ex.advice.advice.aimReps} reps · {WEIGHT_LABELS[ex.advice.advice.weight]}
+        </p>
+      )}
 
       {menu && (
         <div className="grid grid-cols-4 gap-2">
@@ -401,6 +422,32 @@ function Stepper({
       >
         {plusLabel}
       </button>
+    </div>
+  );
+}
+
+/** The progression suggestion: structure from the rules, the kilos stay yours. */
+function AdviceBox({ advice, onAccept, onIgnore }: { advice: Advice; onAccept: () => void; onIgnore: () => void }) {
+  const range = advice.repMin === advice.repMax ? `${advice.repMin}` : `${advice.repMin}–${advice.repMax}`;
+  return (
+    <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3 text-sm">
+      <p className="text-[11px] uppercase tracking-wide text-sky-300">Suggested for today</p>
+      <p className="mt-1">
+        {advice.sets} × {range}
+        {advice.rir !== null && ` @ RIR ${advice.rir}`} · <b className="font-semibold">{WEIGHT_LABELS[advice.weight]}</b>
+      </p>
+      <p className="mt-0.5 text-xs text-neutral-400">
+        Last time ({formatShortDate(advice.basedOn)}) {advice.reason}
+        {advice.repsOnly && " · no RIR logged, judged on reps"}
+      </p>
+      <div className="mt-2 flex gap-2">
+        <button onClick={onAccept} className="h-9 flex-1 rounded-lg bg-sky-500/90 text-xs font-semibold text-neutral-950">
+          Accept
+        </button>
+        <button onClick={onIgnore} className="h-9 flex-1 rounded-lg border border-neutral-700 text-xs text-neutral-300">
+          Ignore
+        </button>
+      </div>
     </div>
   );
 }
