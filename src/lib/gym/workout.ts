@@ -416,7 +416,9 @@ export function toRows(store: Store, now: string): SyncRows {
               target_rir: e.advice.advice.rir,
               source: "engine" as const,
               status: "approved" as const,
-              rationale: `${WEIGHT_LABELS[e.advice.advice.weight]} · ${e.advice.advice.reason}`,
+              rationale: [WEIGHT_LABELS[e.advice.advice.weight], e.advice.advice.blockNote, e.advice.advice.reason]
+                .filter(Boolean)
+                .join(" · "),
             },
           ]
         : [],
@@ -487,12 +489,16 @@ export function suggestNextSet(
   measure: Measure,
 ): SetInput {
   const prev = ex.sets.at(-1);
+  // Block week before a deload: the last set of the accessory goes to a lower RIR.
+  const lastRir = ex.advice?.status === "accepted" ? ex.advice.advice.lastSetRir : null;
+  const isLastSet =
+    lastRir != null && ex.target != null && ex.sets.filter((s) => !s.isWarmup).length === ex.target.sets - 1;
   if (prev) {
     return {
       weightKg: prev.weightKg,
       reps: prev.reps,
       durationS: prev.durationS,
-      rir: prev.rir,
+      rir: isLastSet ? lastRir : prev.rir,
       isWarmup: false,
     };
   }
