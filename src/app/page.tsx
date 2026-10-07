@@ -26,6 +26,7 @@ import { weeklyActuals } from "@/lib/season/progress";
 import { loadAthlete, loadWeeks } from "@/lib/athlete";
 import { plannedLoad } from "@/lib/load";
 import { LoadMeters } from "@/components/load-meters";
+import { checkWeek, legSets, type Check } from "@/lib/week-checks";
 import { signOut } from "./actions";
 import { approveWeek, resolveFlag } from "./week/actions";
 import { PlanRow, type PlanTemplate } from "./week/plan-row";
@@ -89,7 +90,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .maybeSingle(),
     supabase
       .from("workout_templates")
-      .select("id, name, position, template_exercises(position, block, exercises(name))")
+      .select("id, name, position, template_exercises(position, block, sets, target_rir, exercises(name, primary_muscles))")
       .eq("archived", false)
       .order("position"),
     supabase.from("workouts").select("id").eq("status", "in_progress").limit(1).maybeSingle(),
@@ -102,12 +103,19 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
     loadStrength(supabase, { from: monday, to: sunday }).catch(() => null),
   ]);
 
-  // This week's targets from the approved season (Season tab), load and time in zones.
-  const [seasonWeek, weekLoad] = await Promise.all([
+  // This week's targets from the approved season (Season tab), load and time in zones,
+  // and the plans of the 2 days either side (spacing checks across the week boundary).
+  const [seasonWeek, weekLoad, edgeRes] = await Promise.all([
     goal ? loadSeasonWeek(supabase, goal.id, monday).catch(() => null) : null,
     loadAthlete(supabase, today)
       .then(async (athlete) => ({ athlete, ...(await loadWeeks(supabase, athlete, [monday], today)) }))
       .catch(() => null),
+    supabase
+      .from("weekly_plans")
+      .select("day, session_type, target_distance_km, template_id")
+      .gte("day", addDays(monday, -2))
+      .lte("day", addDays(sunday, 2))
+      .or(`day.lt.${monday},day.gt.${sunday}`),
   ]);
 
   const plans = plansRes.data ?? [];
@@ -122,6 +130,20 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .map((e) => e.exercises?.name ?? "?"),
   }));
   const templateName = new Map(templates.map((t) => [t.id, t.name]));
+  const checks: Check[] = plans.length
+    ? checkWeek({
+        monday,
+        plans: [...plans, ...(edgeRes.data ?? [])],
+        templates: (templatesRes.data ?? []).map((t) => ({
+          id: t.id,
+          name: t.name,
+          legSets: legSets(
+            t.template_exercises.map((e) => ({ ...e, primary_muscles: e.exercises?.primary_muscles ?? [] })),
+          ),
+        })),
+        target: seasonWeek?.week ?? null,
+      })
+    : [];
   const flags = flagsRes.data ?? [];
   const pendingFeedback = feedbackRes.data ?? [];
   const nextFeedback = pendingFeedback[0];
@@ -335,6 +357,8 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
         </details>
       )}
 
+      {plans.length > 0 && <WeekChecks checks={checks} proposed={proposedCount > 0} />}
+
       <div className="mb-4 flex gap-2">
         <button
           disabled
@@ -347,6 +371,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
           <form action={approveWeek.bind(null, monday)}>
             <button className="h-full rounded-lg bg-emerald-500 px-3 text-sm font-medium text-neutral-950">
               Approve all ({proposedCount})
+              {checks.some((c) => c.severity === "red") && " · ! red check"}
             </button>
           </form>
         )}
@@ -498,5 +523,30 @@ function DayCard({
         <AddSession day={day} templates={templates} />
       </div>
     </li>
+  );
+}
+
+/** Your rules on this week's plan: warnings only, the decision stays yours. */
+function WeekChecks({ checks, proposed }: { checks: Check[]; proposed: boolean }) {
+  if (checks.length === 0) {
+    return proposed ? (
+      <p className="mb-3 text-xs text-emerald-400">✓ Week checks pass: spacing, gym vs key runs, season targets.</p>
+    ) : null;
+  }
+  return (
+    <section className={`${cardCls} mb-4`}>
+      <p className="mb-2 text-xs uppercase tracking-wide text-neutral-500">
+        Week checks · {checks.length} to look at
+      </p>
+      <ul className="flex flex-col gap-1.5 text-sm">
+        {checks.map((c, i) => (
+          <li key={i} className={c.severity === "red" ? "text-red-300" : "text-amber-200"}>
+            <span className="mr-1 font-semibold">{c.severity === "red" ? "✕" : "!"}</span>
+            {c.message}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-neutral-500">Checks warn, they don&apos;t decide. Red = safety rule.</p>
+    </section>
   );
 }

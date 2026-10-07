@@ -16,8 +16,8 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | Coach | Cowork PT: instructions, weekly review, writes `proposed` sessions / season versions via the Supabase connector (`docs/coach/`) | ✅ |
 | L | Load = volume × intensity: planned weekly load (sRPE) per season week, load-based guardrails, load by type on Season + Week View, time in HR zones (80/20 check), SQL views for Cowork | ✅ |
 | C2b | Gym progression suggestions in the logger (double progression at RIR → sets × reps @ RIR + add / same / lower weight; you accept and pick the kilos) | ✅ |
-| C2a | Week checks: spacing & safety rules on proposed weeks (warn only, red = safety, amber = rest) | ⏳ next |
-| C2c | Gym block periodization: week-in-block patterns (+1 set, last set to RIR 0, deload), rep-range changes between blocks | ⏳ |
+| C2a | Week checks: spacing & safety rules on the Week View (warn only, red = safety, amber = rest) | ✅ |
+| C2c | Gym block periodization: week-in-block patterns (+1 set, last set to RIR 0, deload), rep-range changes between blocks | ⏳ next |
 | C2d | Volume gaps and stalls → question cards (add / swap an exercise: always asked, never applied) | ⏳ |
 | C2e | Week generator from season targets + free days (with D1) | ⏳ |
 | D0 | Coach inbox: one contract any coach writes to (proposed plans + exercise targets + rationale), validated by C2, approved in the app; restricted DB access for coaches | 🟡 via SQL + brief |
@@ -55,6 +55,17 @@ Schema: `exercises` (starter library with `user_id` NULL + your own), `workout_t
 - **Templates** (`/gym/templates`): sets × rep range @ RIR, rest, main/finisher per exercise. Week View gym plans can point at one (Start workout); finishing completes the plan.
 - **Live:** `LiveRefresh` (in `PageShell`) listens to Supabase Realtime on `activities`, `weekly_plans`, `exercise_targets`, `checkins` and finished `workouts`, and refreshes the screen; muscle meters in the logger include the workout in progress.
 - **Today card** (Week View): rule-based suggestion (`src/lib/gym/today.ts`: plan first, next template in rotation, 48 h between full-body sessions) until the AI coach plans the week.
+
+## Week checks (`src/lib/week-checks.ts`)
+
+Your rules on the week's plan (all statuses, plus 2 days either side for spacing across weeks), shown on the Week View above Approve. They warn, never block.
+
+| Severity | Rule |
+|---|---|
+| red | Gym and a hard run (quality or long) on the same day; two hard runs on the same day or on consecutive days; the leg-heaviest gym session the day before a hard run |
+| amber | Leg-heaviest session 2 days before a hard run (~48 h); gym on consecutive days; vs the season week: fewer gym sessions, more runs, more quality sessions (max 2), no long run, km off by > 10% |
+
+Hard run = long run, or a run whose type names tempo / intervals / threshold / fartlek / VO₂ / race / marathon pace. Leg-heaviest = the template(s) with the most loaded leg sets (main block, target RIR set, primary quads / hamstrings / glutes; box jumps don't count): today C (6) vs A and B (3).
 
 ## Strength metrics (`src/lib/strength.ts`)
 
