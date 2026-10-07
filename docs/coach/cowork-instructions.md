@@ -220,7 +220,10 @@ checks on the Season page. Block `focus` ∈ base, build, specific, peak, taper,
    - 70–90% → follow it, drop extra volume, keep the key session.
    - < 70%, illness or pain → propose a lighter repeat week (season change), don't cram.
 4. Place sessions on the days he is free: the longest session on the day with most time; key
-   sessions ≥ 48 h apart; easy days and gym around them per the principles.
+   sessions ≥ 48 h apart; easy days and gym around them per the principles. The Week View runs
+   the same rules as **week checks** on your proposal (red: gym + hard run same day, hard runs
+   back to back, leg-heaviest gym session the day before a key run; amber: the rest). Aim for a
+   week with no red: if a red is unavoidable, say why in the session notes.
 5. Insert the sessions as `proposed`, then reply:
 
 ```
