@@ -27,6 +27,8 @@ import { loadAthlete, loadWeeks } from "@/lib/athlete";
 import { plannedLoad } from "@/lib/load";
 import { LoadMeters } from "@/components/load-meters";
 import { checkWeek, legSets, type Check } from "@/lib/week-checks";
+import { loadInbox } from "@/lib/coach/queries";
+import { CoachInbox } from "@/components/coach-inbox";
 import { signOut } from "./actions";
 import { approveWeek, resolveFlag } from "./week/actions";
 import { PlanRow, type PlanTemplate } from "./week/plan-row";
@@ -105,7 +107,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
 
   // This week's targets from the approved season (Season tab), load and time in zones,
   // and the plans of the 2 days either side (spacing checks across the week boundary).
-  const [seasonWeek, weekLoad, edgeRes] = await Promise.all([
+  const [seasonWeek, weekLoad, edgeRes, inbox] = await Promise.all([
     goal ? loadSeasonWeek(supabase, goal.id, monday).catch(() => null) : null,
     loadAthlete(supabase, today)
       .then(async (athlete) => ({ athlete, ...(await loadWeeks(supabase, athlete, [monday], today)) }))
@@ -116,6 +118,8 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .gte("day", addDays(monday, -2))
       .lte("day", addDays(sunday, 2))
       .or(`day.lt.${monday},day.gt.${sunday}`),
+    // Coach proposals (plan + gym template changes) and the app's gym questions.
+    loadInbox(supabase, today).catch(() => null),
   ]);
 
   const plans = plansRes.data ?? [];
@@ -356,6 +360,8 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
           </div>
         </details>
       )}
+
+      {inbox && <CoachInbox items={inbox.items} questions={inbox.questions} />}
 
       {plans.length > 0 && <WeekChecks checks={checks} proposed={proposedCount > 0} />}
 
