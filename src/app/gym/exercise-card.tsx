@@ -22,11 +22,14 @@ import {
 } from "@/lib/gym/workout";
 import { formatShortDate } from "@/lib/dates";
 import { pendingAdvice, WEIGHT_LABELS, type Advice } from "@/lib/gym/progression";
+import type { Adjustment } from "@/lib/gym/periodization";
 
 type Props = {
   ex: LocalExercise;
   info: ExerciseInfo | undefined;
   last: LastTime | undefined;
+  /** This week's block change for this exercise (season periodization). */
+  adjust?: Adjustment;
   open: boolean;
   isCurrent: boolean;
   isFirst: boolean;
@@ -44,6 +47,7 @@ export function ExerciseCard(p: Props) {
   const measure = info?.measure ?? "reps";
   const prog = progress(ex);
   const done = prog.target !== null && prog.done >= prog.target;
+  const pending = p.open ? null : pendingAdvice(ex, last, measure, p.adjust);
 
   return (
     <section
@@ -62,9 +66,10 @@ export function ExerciseCard(p: Props) {
               Last: {last.sets.filter((s) => !s.is_warmup).map((s) => formatSet(s, measure)).join(" · ")}
             </p>
           )}
-          {!p.open && pendingAdvice(ex, last, measure) && (
+          {!p.open && pending && (
             <p className="truncate text-xs text-sky-300">
-              Suggested: {WEIGHT_LABELS[pendingAdvice(ex, last, measure)!.weight]}
+              Suggested: {WEIGHT_LABELS[pending.weight]}
+              {pending.sets !== ex.target?.sets && ` · ${pending.sets} sets`}
             </p>
           )}
         </div>
@@ -89,11 +94,12 @@ function OpenBody({
   onLogged,
   onSwap,
   measure,
+  adjust,
 }: Props & { measure: "reps" | "time" }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const suggested = suggestNextSet(ex, last, measure);
-  const advice = pendingAdvice(ex, last, measure);
+  const advice = pendingAdvice(ex, last, measure, adjust);
   const editingSet = ex.sets.find((s) => s.id === editing) ?? null;
   const t = ex.target;
   const targetText = t
@@ -436,10 +442,14 @@ function AdviceBox({ advice, onAccept, onIgnore }: { advice: Advice; onAccept: (
         {advice.sets} × {range}
         {advice.rir !== null && ` @ RIR ${advice.rir}`} · <b className="font-semibold">{WEIGHT_LABELS[advice.weight]}</b>
       </p>
-      <p className="mt-0.5 text-xs text-neutral-400">
-        Last time ({formatShortDate(advice.basedOn)}) {advice.reason}
-        {advice.repsOnly && " · no RIR logged, judged on reps"}
-      </p>
+      {advice.lastSetRir != null && <p className="text-xs">Last set to RIR {advice.lastSetRir}</p>}
+      {advice.blockNote && <p className="mt-0.5 text-xs text-sky-200/80">{advice.blockNote}</p>}
+      {advice.basedOn && (
+        <p className="mt-0.5 text-xs text-neutral-400">
+          Last time ({formatShortDate(advice.basedOn)}) {advice.reason}
+          {advice.repsOnly && " · no RIR logged, judged on reps"}
+        </p>
+      )}
       <div className="mt-2 flex gap-2">
         <button onClick={onAccept} className="h-9 flex-1 rounded-lg bg-sky-500/90 text-xs font-semibold text-neutral-950">
           Accept

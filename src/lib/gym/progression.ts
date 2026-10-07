@@ -20,8 +20,9 @@
 //           under the range but easier than target, push to the target RIR
 
 import type { HistorySet, LastTime, LocalExercise, Measure, Target } from "./workout";
+import type { Adjustment } from "./periodization";
 
-export type WeightDirection = "add" | "same" | "lower";
+export type WeightDirection = "add" | "same" | "keep" | "lower";
 
 export type Advice = {
   weight: WeightDirection;
@@ -32,11 +33,15 @@ export type Advice = {
   /** Reps to aim for on the first working set. */
   aimReps: number;
   /** The weight last time's sets were judged at (prefill start point; you pick the kilos). */
-  basisKg: number;
-  /** One line, e.g. "10·10·10·10 @ RIR 2: top of the range". */
+  basisKg: number | null;
+  /** RIR for the last set only (block week before a deload). */
+  lastSetRir?: number | null;
+  /** What the season block changes this week, e.g. "Lighter week: half the sets…". */
+  blockNote?: string | null;
+  /** One line, e.g. "10·10·10·10 @ RIR 2: top of the range". Empty when only the block speaks. */
   reason: string;
-  /** Date of the session the advice is based on. */
-  basedOn: string;
+  /** Date of the session the advice is based on (null: block change only, no history). */
+  basedOn: string | null;
   /** No RIR was logged: judged on reps only. */
   repsOnly: boolean;
 };
@@ -134,8 +139,51 @@ export function adviseNext(
 export const WEIGHT_LABELS: Record<WeightDirection, string> = {
   add: "add weight",
   same: "same weight, +1 rep per set",
+  keep: "same weight",
   lower: "lower the weight",
 };
+
+/**
+ * Progression advice with this week's block change on top: the block sets the
+ * sets / RIR (and, in a deload, holds the weight); progression keeps the reps
+ * and the weight direction. A block change alone (no history yet) still
+ * makes a suggestion.
+ */
+export function withBlock(
+  advice: Advice | null,
+  adjust: Adjustment | undefined,
+  target: Target | null,
+): Advice | null {
+  if (!adjust) return advice;
+  if (advice) {
+    // A deload holds the weight (no extra reps), but never overrides "lower".
+    const hold = adjust.weight === "keep" && advice.weight !== "lower";
+    return {
+      ...advice,
+      sets: adjust.sets,
+      rir: adjust.rir,
+      lastSetRir: adjust.lastSetRir,
+      weight: hold ? "keep" : advice.weight,
+      aimReps: hold ? advice.repMin : advice.aimReps,
+      blockNote: adjust.note,
+    };
+  }
+  if (!target || target.repMin == null || target.repMax == null) return null;
+  return {
+    weight: "keep",
+    sets: adjust.sets,
+    repMin: target.repMin,
+    repMax: target.repMax,
+    rir: adjust.rir,
+    aimReps: target.repMin,
+    reason: "",
+    basedOn: null,
+    repsOnly: false,
+    basisKg: null,
+    lastSetRir: adjust.lastSetRir,
+    blockNote: adjust.note,
+  };
+}
 
 /**
  * The suggestion still waiting for your answer on an exercise: none once you
@@ -145,7 +193,9 @@ export function pendingAdvice(
   ex: Pick<LocalExercise, "target" | "sets" | "advice" | "block">,
   last: LastTime | undefined,
   measure: Measure,
+  adjust?: Adjustment,
 ): Advice | null {
   if (ex.advice || ex.sets.some((s) => !s.isWarmup)) return null;
-  return adviseNext(ex.target, last, measure, ex.block);
+  if (measure !== "reps") return null;
+  return withBlock(adviseNext(ex.target, last, measure, ex.block), adjust, ex.target);
 }

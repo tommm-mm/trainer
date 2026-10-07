@@ -17,8 +17,9 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | L | Load = volume × intensity: planned weekly load (sRPE) per season week, load-based guardrails, load by type on Season + Week View, time in HR zones (80/20 check), SQL views for Cowork | ✅ |
 | C2b | Gym progression suggestions in the logger (double progression at RIR → sets × reps @ RIR + add / same / lower weight; you accept and pick the kilos) | ✅ |
 | C2a | Week checks: spacing & safety rules on the Week View (warn only, red = safety, amber = rest) | ✅ |
-| C2c | Gym block periodization: week-in-block patterns (+1 set, last set to RIR 0, deload), rep-range changes between blocks | ⏳ next |
-| C2d | Volume gaps and stalls → question cards (add / swap an exercise: always asked, never applied) | ⏳ |
+| C2c | Gym block periodization in the logger: deload (any block), +1 set / last set to RIR 0 (hypertrophy blocks), from the approved season | ✅ |
+| C2c+ | Strength / maintenance templates and rep ranges for Build (30 Nov) and later blocks | ⏳ |
+| C2d | Volume gaps and stalls → question cards (add / swap an exercise: always asked, never applied) | ⏳ next |
 | C2e | Week generator from season targets + free days (with D1) | ⏳ |
 | D0 | Coach inbox: one contract any coach writes to (proposed plans + exercise targets + rationale), validated by C2, approved in the app; restricted DB access for coaches | 🟡 via SQL + brief |
 | W | Garmin wellness sync (VO₂max, HRV, resting HR, sleep, CTL/ATL) → Stats › Fitness | ⏳ |
@@ -49,6 +50,7 @@ Schema: `exercises` (starter library with `user_id` NULL + your own), `workout_t
 
 - **Local-first:** the in-progress workout lives in `localStorage`; every edit bumps a revision and is pushed as idempotent upserts on client-generated UUIDs (`src/lib/gym/push.ts`). Offline edits retry on reconnect and every 10 s; deletes are tombstoned until confirmed. Logic is pure and tested in `src/lib/gym/workout.ts`.
 - **Prefill:** previous set today → last time's first working set → template target.
+- **Block weeks** (`src/lib/gym/periodization.ts`): the approved season sets this week's step, counting back from the next lighter week. Lighter week (deload, taper, recovery, transition) → half the sets (rounded up), RIR ≥ 3, **same weight** (unless progression says lower), finishers untouched. In hypertrophy blocks, 2 weeks before it → +1 set on the session's two upper-body compounds; the week before → last set of the upper-body accessories to RIR 0 (prefilled on the last set). Base 1: 12 Oct +1 set · 19 Oct RIR 0 · 26 Oct deload. Shown inside the same suggestion and accepted the same way.
 - **Progression suggestions** (`src/lib/gym/progression.ts`, pure + tested): on each exercise, from your last session of it, computed on the phone when you open the workout. Judged on the sets at the weight you did most sets at (a top set + back-offs → the back-offs; a tie → the weight you finished on). Half the sets under the range → **lower the weight** (unless easier than target RIR: then push to the target RIR); every target set at the top of the range and not grinding, or ≥ 2 RIR easier than target → **add weight** (restart at the bottom); otherwise **same weight, +1 rep per set**. No suggestion for finishers, timed or fixed-rep-no-RIR exercises. The app never proposes kilos. **Accept** (per exercise or "Accept all") sets the target and prefills the judged weight and the reps to aim for; **Ignore** keeps the template. Accepted suggestions are saved as `approved` `exercise_targets` rows (source `engine`, with the reason) so the coach sees what you took on.
 - **Finish:** session RPE → linked Garmin activity's `rpe` (so it counts in sRPE load once) and its feedback card is answered.
 - Opening `/gym` needs signal once (no service worker until Phase F); after that the workout runs offline.

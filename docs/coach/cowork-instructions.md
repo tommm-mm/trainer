@@ -305,6 +305,11 @@ raises if the long run is the next morning). Box jumps first in B.
 When gym drops to 2×/week (Build): **Mon + Thu**, easy bike Wednesday, Saturday free before a
 Sunday long run.
 
+The gym logger applies this table as suggestions (computed from the approved season's lighter
+weeks; he accepts per exercise): +1 set, last set to RIR 0, deload. You don't need to write
+exercise targets for it. Build (30 Nov) needs new strength templates (2×, 3×4–6 @ RIR 2): propose
+them to Tommaso in November.
+
 | Week of | Running | Gym |
 |---|---|---|
 | 5 Oct, 2 Nov | build | sets as in the templates; double progression |

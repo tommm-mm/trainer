@@ -11,6 +11,9 @@ import {
   type TemplateInput,
 } from "@/lib/gym/workout";
 import { GymApp, type RecentWorkout } from "./gym-app";
+import { getActiveGoal } from "@/lib/queries";
+import { loadSeasons } from "@/lib/season/queries";
+import { blockContext } from "@/lib/gym/periodization";
 
 const HISTORY_DAYS = 180;
 
@@ -25,7 +28,7 @@ export default async function GymPage({ searchParams }: PageProps<"/gym">) {
   const monday = mondayOf(today);
   const supabase = await createClient();
 
-  const [tplRes, exRes, histRes, activeRes, week] = await Promise.all([
+  const [tplRes, exRes, histRes, activeRes, week, blockCtx] = await Promise.all([
     supabase
       .from("workout_templates")
       .select(
@@ -59,6 +62,14 @@ export default async function GymPage({ searchParams }: PageProps<"/gym">) {
       .limit(1)
       .maybeSingle(),
     loadStrength(supabase, { from: monday, to: addDays(monday, 6) }).catch(() => null),
+    // This week in the approved season: drives the block suggestions (deload, +1 set…).
+    getActiveGoal(supabase)
+      .then(async (goal) => {
+        if (!goal) return null;
+        const { approved } = await loadSeasons(supabase, goal.id);
+        return approved ? blockContext(approved.blocks, monday) : null;
+      })
+      .catch(() => null),
   ]);
   const loadError = tplRes.error ?? exRes.error ?? histRes.error ?? activeRes.error;
 
@@ -117,6 +128,7 @@ export default async function GymPage({ searchParams }: PageProps<"/gym">) {
         weekSessions={week?.sessions ?? []}
         index={week?.index ?? {}}
         planned={planned}
+        blockCtx={blockCtx}
       />
     </PageShell>
   );
