@@ -203,6 +203,21 @@ select rest_hr, max_hr, threshold_hr, threshold_date, easy_from, marathon_from, 
 select load_calibration, updated_at from athlete_settings;
 ```
 
+**Check a draft before you propose it** (nothing is written; same rules as the app, kept in sync by
+tests). Iterate until it's clean or every remaining warning is one you'd explain to him.
+
+```sql
+-- a season draft (the whole SeasonDraft JSON you'd pass to create_season_proposal):
+-- errors = it would be refused; warnings = ramp, ACWR (km and load), lighter weeks, long-run share,
+-- run-load ramp, your caps, race week. Seeded with his actual km and load of the 4 weeks before it.
+select check_season_draft((select id from goals where status = 'active'), '<SeasonDraft JSON>'::jsonb);
+-- a week's sessions as a draft: his saved sessions that aren't proposed + yours.
+-- red = safety (gym + hard run same day, hard runs back to back, leg-heaviest gym the day before a
+-- hard run); amber = rest and totals vs the season week. Without the list: checks what's saved.
+select check_week('<Monday>', '[{"day":"<YYYY-MM-DD>","session_type":"tempo","target_distance_km":10},
+                                {"day":"<YYYY-MM-DD>","session_type":"gym_full","template_id":"<id>"}]'::jsonb);
+```
+
 **Write next week's sessions** (one row per session; gym rows carry the template id from
 `select id, name from workout_templates where not archived`):
 

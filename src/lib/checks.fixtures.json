@@ -1,0 +1,467 @@
+{
+  "season": [
+    {
+      "name": "ramp, ACWR, long-run share, caps, deload streak, race week",
+      "today": "2026-10-08",
+      "goal": {
+        "target_date": "2027-01-17",
+        "tune_up_races": [
+          {
+            "name": "10k",
+            "date": "2026-12-13"
+          }
+        ]
+      },
+      "calibration": {
+        "easy_min_per_km": 6.5,
+        "easy_rpe": 3,
+        "gym_min": 60,
+        "gym_rpe": 6,
+        "cross_min": 40,
+        "cross_rpe": 3,
+        "hiit_week": 50
+      },
+      "history": [
+        {
+          "week_start": "2026-10-05",
+          "run_km": 28,
+          "run_load": 600
+        },
+        {
+          "week_start": "2026-10-12",
+          "run_km": 30,
+          "run_load": 620
+        },
+        {
+          "week_start": "2026-10-19",
+          "run_km": 26,
+          "run_load": 560
+        },
+        {
+          "week_start": "2026-10-26",
+          "run_km": 31,
+          "run_load": 640
+        }
+      ],
+      "draft": {
+        "title": "Test season",
+        "source": "cowork",
+        "limits": {
+          "max_week_km": 50,
+          "max_long_run_km": 25,
+          "max_runs_per_week": 5,
+          "max_gym_per_week": 3
+        },
+        "blocks": [
+          {
+            "name": "Base",
+            "focus": "base",
+            "gym_focus": "hypertrophy",
+            "weeks": [
+              {
+                "week_start": "2026-11-02",
+                "run_km": 32,
+                "long_run_km": 12,
+                "runs": 4,
+                "quality_sessions": 1,
+                "gym_sessions": 3
+              },
+              {
+                "week_start": "2026-11-09",
+                "run_km": 45,
+                "long_run_km": 14,
+                "runs": 5,
+                "quality_sessions": 1,
+                "gym_sessions": 3
+              },
+              {
+                "week_start": "2026-11-16",
+                "run_km": 30,
+                "long_run_km": 16,
+                "runs": 4,
+                "quality_sessions": 2,
+                "gym_sessions": 4
+              },
+              {
+                "week_start": "2026-11-23",
+                "run_km": 52,
+                "long_run_km": 27,
+                "runs": 6,
+                "quality_sessions": 1,
+                "gym_sessions": 3
+              }
+            ]
+          },
+          {
+            "name": "Build",
+            "focus": "build",
+            "gym_focus": "strength",
+            "weeks": [
+              {
+                "week_start": "2026-11-30",
+                "run_km": 40,
+                "long_run_km": 21,
+                "runs": 4,
+                "quality_sessions": 2,
+                "gym_sessions": 2
+              },
+              {
+                "week_start": "2026-12-07",
+                "run_km": 30,
+                "long_run_km": 10,
+                "runs": 4,
+                "quality_sessions": 1,
+                "gym_sessions": 2,
+                "is_deload": true
+              },
+              {
+                "week_start": "2026-12-14",
+                "run_km": 30,
+                "long_run_km": 10,
+                "runs": 4,
+                "quality_sessions": 1,
+                "gym_sessions": 2
+              },
+              {
+                "week_start": "2026-12-21",
+                "run_km": 42,
+                "long_run_km": 18,
+                "runs": 5,
+                "quality_sessions": 2,
+                "gym_sessions": 2,
+                "load_target": 2600
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "errors": 0,
+        "warnings": [
+          "2026-11-02 load_acwr",
+          "2026-11-09 load_ramp",
+          "2026-11-09 load_acwr",
+          "2026-11-09 ramp",
+          "2026-11-09 acwr",
+          "2026-11-16 load_acwr",
+          "2026-11-16 long_share",
+          "2026-11-16 cap",
+          "2026-11-23 load_ramp",
+          "2026-11-23 load_acwr",
+          "2026-11-23 ramp",
+          "2026-11-23 acwr",
+          "2026-11-23 long_share",
+          "2026-11-23 cap",
+          "2026-11-23 cap",
+          "2026-11-23 cap",
+          "2026-11-30 deload",
+          "2026-11-30 long_share",
+          "2026-12-21 load_acwr",
+          "2026-12-21 race_week"
+        ]
+      }
+    },
+    {
+      "name": "structural errors",
+      "today": "2026-10-08",
+      "goal": {
+        "target_date": null,
+        "tune_up_races": []
+      },
+      "calibration": {},
+      "history": [],
+      "draft": {
+        "title": " ",
+        "source": "someone",
+        "blocks": [
+          {
+            "name": "B",
+            "focus": "speed",
+            "gym_focus": "cardio",
+            "weeks": [
+              {
+                "week_start": "2026-11-03",
+                "run_km": 30
+              },
+              {
+                "week_start": "2026-11-16",
+                "run_km": 30,
+                "long_run_km": 35
+              },
+              {
+                "week_start": "2026-11-23",
+                "run_km": 400,
+                "runs": "4"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "errors": 9,
+        "warnings": []
+      }
+    }
+  ],
+  "week": [
+    {
+      "name": "same day, back to back, legs before hard, gym spacing, totals",
+      "monday": "2026-11-30",
+      "templates": [
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Strength A",
+          "leg_sets": 6
+        },
+        {
+          "id": "22222222-2222-2222-2222-222222222222",
+          "name": "Strength B",
+          "leg_sets": 3
+        }
+      ],
+      "target": {
+        "run_km": 42,
+        "long_run_km": 18,
+        "runs": 4,
+        "quality_sessions": 1,
+        "gym_sessions": 3
+      },
+      "plans": [
+        {
+          "day": "2026-11-29",
+          "session_type": "long_run",
+          "target_distance_km": 18,
+          "template_id": null
+        },
+        {
+          "day": "2026-11-30",
+          "session_type": "tempo",
+          "target_distance_km": 10,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-01",
+          "session_type": "gym_full",
+          "target_distance_km": null,
+          "template_id": "11111111-1111-1111-1111-111111111111"
+        },
+        {
+          "day": "2026-12-02",
+          "session_type": "gym_full",
+          "target_distance_km": null,
+          "template_id": "22222222-2222-2222-2222-222222222222"
+        },
+        {
+          "day": "2026-12-03",
+          "session_type": "intervals",
+          "target_distance_km": 9,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-03",
+          "session_type": "gym_full",
+          "target_distance_km": null,
+          "template_id": "22222222-2222-2222-2222-222222222222"
+        },
+        {
+          "day": "2026-12-05",
+          "session_type": "easy_run",
+          "target_distance_km": 8,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-05",
+          "session_type": "mobility",
+          "target_distance_km": null,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-06",
+          "session_type": "Marathon pace run",
+          "target_distance_km": 6,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-06",
+          "session_type": "bike_easy",
+          "target_distance_km": null,
+          "template_id": null
+        }
+      ],
+      "expect": [
+        "red gym_hard_same_day 2026-12-03",
+        "red hard_back_to_back 2026-11-29,2026-11-30",
+        "amber gym_back_to_back 2026-12-01,2026-12-02",
+        "amber legs_before_hard 2026-12-01,2026-12-03",
+        "amber gym_back_to_back 2026-12-02,2026-12-03",
+        "amber quality_count",
+        "amber long_run",
+        "amber km"
+      ]
+    },
+    {
+      "name": "a clean week",
+      "monday": "2026-12-07",
+      "templates": [
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Strength A",
+          "leg_sets": 6
+        },
+        {
+          "id": "22222222-2222-2222-2222-222222222222",
+          "name": "Strength B",
+          "leg_sets": 3
+        }
+      ],
+      "target": {
+        "run_km": 45,
+        "long_run_km": 20,
+        "runs": 4,
+        "quality_sessions": 1,
+        "gym_sessions": 2
+      },
+      "plans": [
+        {
+          "day": "2026-12-07",
+          "session_type": "gym_full",
+          "target_distance_km": null,
+          "template_id": "11111111-1111-1111-1111-111111111111"
+        },
+        {
+          "day": "2026-12-08",
+          "session_type": "easy_run",
+          "target_distance_km": 9,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-09",
+          "session_type": "bike_easy",
+          "target_distance_km": null,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-10",
+          "session_type": "tempo",
+          "target_distance_km": 10,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-11",
+          "session_type": "gym_full",
+          "target_distance_km": null,
+          "template_id": "22222222-2222-2222-2222-222222222222"
+        },
+        {
+          "day": "2026-12-12",
+          "session_type": "easy_run",
+          "target_distance_km": 6,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-13",
+          "session_type": "long_run",
+          "target_distance_km": 20,
+          "template_id": null
+        }
+      ],
+      "expect": []
+    },
+    {
+      "name": "the same week passed as a draft (dry run)",
+      "monday": "2026-11-30",
+      "templates": [
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Strength A",
+          "leg_sets": 6
+        },
+        {
+          "id": "22222222-2222-2222-2222-222222222222",
+          "name": "Strength B",
+          "leg_sets": 3
+        }
+      ],
+      "target": {
+        "run_km": 42,
+        "long_run_km": 18,
+        "runs": 4,
+        "quality_sessions": 1,
+        "gym_sessions": 3
+      },
+      "plans": [
+        {
+          "day": "2026-11-29",
+          "session_type": "long_run",
+          "target_distance_km": 18,
+          "template_id": null
+        },
+        {
+          "day": "2026-11-30",
+          "session_type": "tempo",
+          "target_distance_km": 10,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-01",
+          "session_type": "gym_full",
+          "target_distance_km": null,
+          "template_id": "11111111-1111-1111-1111-111111111111"
+        },
+        {
+          "day": "2026-12-02",
+          "session_type": "gym_full",
+          "target_distance_km": null,
+          "template_id": "22222222-2222-2222-2222-222222222222"
+        },
+        {
+          "day": "2026-12-03",
+          "session_type": "intervals",
+          "target_distance_km": 9,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-03",
+          "session_type": "gym_full",
+          "target_distance_km": null,
+          "template_id": "22222222-2222-2222-2222-222222222222"
+        },
+        {
+          "day": "2026-12-05",
+          "session_type": "easy_run",
+          "target_distance_km": 8,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-05",
+          "session_type": "mobility",
+          "target_distance_km": null,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-06",
+          "session_type": "Marathon pace run",
+          "target_distance_km": 6,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-06",
+          "session_type": "bike_easy",
+          "target_distance_km": null,
+          "template_id": null
+        }
+      ],
+      "expect": [
+        "red gym_hard_same_day 2026-12-03",
+        "red hard_back_to_back 2026-11-29,2026-11-30",
+        "amber gym_back_to_back 2026-12-01,2026-12-02",
+        "amber legs_before_hard 2026-12-01,2026-12-03",
+        "amber gym_back_to_back 2026-12-02,2026-12-03",
+        "amber quality_count",
+        "amber long_run",
+        "amber km"
+      ],
+      "as_draft": true
+    }
+  ]
+}
