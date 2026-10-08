@@ -18,6 +18,7 @@ import { formatNumber } from "@/lib/format";
 import { sessionKind, sessionLabel } from "@/lib/sessions";
 import { loadStrength } from "@/lib/gym/queries";
 import { todayAction } from "@/lib/gym/today";
+import { forFocus } from "@/lib/gym/templates";
 import { muscleSets, type StrengthSession } from "@/lib/strength";
 import { MuscleMeters } from "@/components/muscle-meters";
 import { TargetMeters } from "@/components/season-targets";
@@ -92,7 +93,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .maybeSingle(),
     supabase
       .from("workout_templates")
-      .select("id, name, position, template_exercises(position, block, sets, target_rir, exercises(name, primary_muscles))")
+      .select("id, name, position, gym_focus, template_exercises(position, block, sets, target_rir, exercises(name, primary_muscles))")
       .eq("archived", false)
       .order("position"),
     supabase.from("workouts").select("id").eq("status", "in_progress").limit(1).maybeSingle(),
@@ -134,11 +135,17 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .map((e) => e.exercises?.name ?? "?"),
   }));
   const templateName = new Map(templates.map((t) => [t.id, t.name]));
+  // This block's templates (tagged for its gym focus, or untagged): the Today
+  // rotation and the leg-heaviest check use these, plus any template planned this week.
+  const blockIds = new Set(forFocus(templatesRes.data ?? [], seasonWeek?.block.gym_focus ?? null).map((t) => t.id));
+  const blockTemplates = templates.filter((t) => blockIds.has(t.id));
+  const plannedIds = new Set([...plans, ...(edgeRes.data ?? [])].map((p) => p.template_id));
+  const gymTarget = seasonWeek?.week.gym_sessions ?? Math.max(blockTemplates.length, 1);
   const checks: Check[] = plans.length
     ? checkWeek({
         monday,
         plans: [...plans, ...(edgeRes.data ?? [])],
-        templates: (templatesRes.data ?? []).map((t) => ({
+        templates: (templatesRes.data ?? []).filter((t) => blockIds.has(t.id) || plannedIds.has(t.id)).map((t) => ({
           id: t.id,
           name: t.name,
           legSets: legSets(
@@ -189,8 +196,8 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
         runDoneToday: activities.some((a) => a.type === "run" && a.date === today),
         gymDatesThisWeek: gymDates.filter((d) => d <= today),
         lastGymDate,
-        gymTarget: Math.max(templates.length, 1),
-        templates,
+        gymTarget,
+        templates: blockTemplates,
         lastTemplateId: recentWorkouts.find((w) => w.template_id)?.template_id ?? null,
       })
     : null;
@@ -346,7 +353,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       <section className="mb-4 grid grid-cols-3 gap-2">
         <Stat label="Planned km" value={formatNumber(plannedKm)} />
         <Stat label="Run km" value={formatNumber(doneKm)} />
-        <Stat label="Gym sessions" value={`${gymDates.length}/${Math.max(templates.length, 1)}`} />
+        <Stat label="Gym sessions" value={`${gymDates.length}/${gymTarget}`} />
       </section>
 
       {weekMuscles && workouts.length > 0 && (

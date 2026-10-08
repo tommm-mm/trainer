@@ -4,7 +4,7 @@ import { PageShell } from "@/components/bottom-nav";
 import { btnDanger, btnSmall, cardCls } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { archiveTemplate, moveItem, removeItem } from "../actions";
-import { AddItemForm, ConfirmForm, ItemForm, RenameForm } from "../forms";
+import { AddItemForm, ConfirmForm, FocusForm, ItemForm, RenameForm } from "../forms";
 
 const GROUPS = ["chest", "back", "shoulders", "biceps", "triceps", "quads", "hamstrings", "glutes", "calves", "core"];
 
@@ -15,7 +15,7 @@ export default async function TemplatePage({ params }: PageProps<"/gym/templates
     supabase
       .from("workout_templates")
       .select(
-        "id, name, template_exercises(id, position, block, sets, rep_min, rep_max, target_rir, rest_seconds, exercises(name, measure, primary_muscles))",
+        "id, name, gym_focus, template_exercises(id, position, block, sets, rep_min, rep_max, target_rir, rest_seconds, exercises(name, measure, primary_muscles))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -38,6 +38,9 @@ export default async function TemplatePage({ params }: PageProps<"/gym/templates
       <div className="mb-4 mt-2">
         <RenameForm id={t.id} name={t.name} />
       </div>
+      <section className={`${cardCls} mb-4`}>
+        <FocusForm id={t.id} focus={t.gym_focus} />
+      </section>
 
       <ol className="flex flex-col gap-3">
         {items.map((it, i) => (

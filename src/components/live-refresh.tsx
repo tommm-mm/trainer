@@ -17,6 +17,7 @@ const TABLES = [
   "checkins",
   "seasons",
   "season_weeks",
+  "gym_week_rules",
 ] as const;
 const DEBOUNCE_MS = 600;
 const STALE_AFTER_MS = 60_000;

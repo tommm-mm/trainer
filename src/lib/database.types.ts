@@ -610,10 +610,35 @@ export type Database = {
           },
         ]
       }
+      gym_week_rules: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          rules: Json
+          source: string
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          rules: Json
+          source?: string
+          updated_at?: string
+          user_id?: string
+          week_start: string
+        }
+        Update: Partial<Database["public"]["Tables"]["gym_week_rules"]["Insert"]>
+        Relationships: []
+      }
       workout_templates: {
         Row: {
           archived: boolean
           created_at: string
+          gym_focus: string[] | null
           id: string
           name: string
           notes: string | null
@@ -623,6 +648,7 @@ export type Database = {
         Insert: {
           archived?: boolean
           created_at?: string
+          gym_focus?: string[] | null
           id?: string
           name: string
           notes?: string | null

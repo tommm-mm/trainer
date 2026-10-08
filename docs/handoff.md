@@ -1,4 +1,4 @@
-# Handoff: where the build stands (7 Oct 2026)
+# Handoff: where the build stands (8 Oct 2026)
 
 For a new Claude Code session. Read `README.md` (build status + formulas) and
 `docs/coach/cowork-instructions.md` (the PT's rules) first.
@@ -24,19 +24,21 @@ For a new Claude Code session. Read `README.md` (build status + formulas) and
 | C2b | gym progression suggestions in the logger (sets × reps @ RIR + add / same / lower weight) | #14 |
 | C2a | week checks on the Week View (red = safety, amber = rest, warn only) | #15 |
 | C2c | block periodization (+1 set, last set RIR 0, deload) from the approved season | #16 |
+| D0 + C2d | `coach_proposals` inbox; the app's own gym questions as Yes / No cards | #17 |
 
 ## In review
 
-- **D0 + C2d** (this PR): `coach_proposals` inbox so Cowork can move / change / cancel sessions
-  and change gym templates (Approve on the Week View applies it atomically); the app's own gym
-  questions (volume gaps, stalls) as Yes / No cards. Needs migration
-  `20261007120000_coach_proposals.sql` applied.
+- **C2c+ coach gym tools** (this PR): templates tagged by block (`workout_templates.gym_focus`),
+  `exercise_create`, `template_update`, and per-week coach rules (`gym_week_rules`, kind
+  `gym_rules_set`) that replace the default block rules. Needs migration
+  `20261008120000_coach_gym_tools.sql`. **The program itself is the PT's** (Cowork project):
+  Tommaso corrected this on 8 Oct; Claude Code builds tools, never picks exercises / sets / loads.
 
 ## Next (roadmap, in order of value)
 
-1. **C2c+ Build templates** (before 30 Nov): 2× strength templates (3×4–6 @ RIR 2, heavy legs +
-   plyos). Cowork can now propose them with `template_create`; the strength block also needs its
-   own progression rules (e.g. load waves) if Tommaso wants more than double progression.
+1. **Build templates** (before 30 Nov): **Cowork designs and proposes them** (templates tagged
+   `strength`, any new exercises, week rules). After the first Build week, verify on real data
+   (prefill, suggestions, week checks, Today rotation).
 2. **W** Garmin wellness sync (HRV, resting HR, sleep) → recovery flags in the Cowork check.
 3. **D1** AI planner via the Claude API (writes the same proposals), then **E** automatic Sunday
    plan, **F** PWA + notifications, **U** UX review.

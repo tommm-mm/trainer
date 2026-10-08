@@ -23,7 +23,7 @@ export function CoachInbox({ items, questions }: { items: InboxItem[]; questions
               {it.error ? (
                 <p className="text-xs text-red-300">{it.error}</p>
               ) : (
-                <p className="text-sm text-neutral-300">
+                <p className="whitespace-pre-line text-sm text-neutral-300">
                   {it.before && <span className="text-neutral-500 line-through decoration-neutral-600">{it.before}</span>}
                   {it.before && <span className="text-neutral-500"> → </span>}
                   {it.after}

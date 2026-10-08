@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { GYM_FOCUSES } from "@/lib/gym/templates";
 import { FormError, num, requiredText, text, toErrorState, type ActionState } from "@/lib/form";
 
 // Template editing. Changes apply to workouts started afterwards; logged
@@ -49,6 +50,30 @@ export async function renameTemplate(id: string, _prev: ActionState, form: FormD
   }
   done(id);
   return { error: null, ok: true };
+}
+
+/** Which block gym focuses a template is for (none ticked = every block). */
+export async function setTemplateFocus(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const picked = GYM_FOCUSES.filter((f) => form.get(f) === "on");
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("workout_templates")
+      .update({ gym_focus: picked.length ? picked : null })
+      .eq("id", id);
+    if (error) throw error;
+  } catch (err) {
+    return toErrorState(err);
+  }
+  done(id);
+  return { error: null, ok: true };
+}
+
+export async function restoreTemplate(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("workout_templates").update({ archived: false }).eq("id", id);
+  if (error) throw error;
+  done(id);
 }
 
 export async function archiveTemplate(id: string) {

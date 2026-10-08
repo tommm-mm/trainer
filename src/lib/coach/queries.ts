@@ -3,6 +3,7 @@ import { addDays, mondayOf } from "@/lib/dates";
 import { getActiveGoal } from "@/lib/queries";
 import { loadSeasons } from "@/lib/season/queries";
 import { blockContext } from "@/lib/gym/periodization";
+import { forFocus } from "@/lib/gym/templates";
 import { loadStrength } from "@/lib/gym/queries";
 import { stallQuestions, volumeQuestions, type Question, type QuestionTemplate } from "@/lib/gym/questions";
 import { describeProposal, type ProposalContext } from "./proposals";
@@ -34,7 +35,7 @@ export async function loadInbox(supabase: DB, today: string): Promise<{ items: I
       .or(`status.eq.proposed,decided_at.gte.${addDays(today, -QUESTION_QUIET_DAYS)}`),
     supabase
       .from("workout_templates")
-      .select("id, name, archived, template_exercises(id, exercise_id, block, sets, rep_min, rep_max, target_rir)")
+      .select("id, name, archived, gym_focus, template_exercises(id, exercise_id, block, sets, rep_min, rep_max, target_rir)")
       .order("position"),
     supabase
       .from("exercises")
@@ -54,6 +55,7 @@ export async function loadInbox(supabase: DB, today: string): Promise<{ items: I
   const ctx: ProposalContext = {
     plans: new Map((plansRes.data ?? []).map((p) => [p.id, { ...p, target_distance_km: p.target_distance_km === null ? null : Number(p.target_distance_km) }])),
     templates: new Map(templates.map((t) => [t.id, t.name])),
+    templateFocus: new Map(templates.map((t) => [t.id, t.gym_focus])),
     templateExercises: new Map(
       templates.flatMap((t) =>
         t.template_exercises.map((te) => [te.id, { ...te, template: t.name, exercise: exName.get(te.exercise_id) ?? "?" }] as const),
@@ -73,9 +75,6 @@ export async function loadInbox(supabase: DB, today: string): Promise<{ items: I
 
   // The app's own questions, minus any asked recently.
   const quiet = new Set((keysRes.data ?? []).map((k) => k.dedupe_key));
-  const active: QuestionTemplate[] = templates
-    .filter((t) => !t.archived)
-    .map((t) => ({ id: t.id, name: t.name, items: t.template_exercises }));
   const lib = library.filter((e) => !e.archived);
   const [gymFocus, strength] = await Promise.all([
     getActiveGoal(supabase)
@@ -87,6 +86,11 @@ export async function loadInbox(supabase: DB, today: string): Promise<{ items: I
       .catch(() => null),
     loadStrength(supabase, { from: addDays(today, -STALL_HISTORY_DAYS), to: today }).catch(() => null),
   ]);
+  // Only the current block's templates (tagged for its gym focus, or untagged).
+  const active: QuestionTemplate[] = forFocus(
+    templates.filter((t) => !t.archived),
+    gymFocus,
+  ).map((t) => ({ id: t.id, name: t.name, items: t.template_exercises }));
   const questions = [
     ...volumeQuestions({ templates: active, library: lib, gymFocus }),
     ...stallQuestions({ templates: active, library: lib, sessions: strength?.sessions ?? [] }),

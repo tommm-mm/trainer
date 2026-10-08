@@ -12,15 +12,21 @@
 //                 upper-body accessories to RIR 0
 //   base          otherwise: the template as written
 // Base 1 2026: 5 Oct base · 12 Oct +1 set · 19 Oct RIR 0 · 26 Oct deload.
+// A week with coach rules (gym_week_rules) uses those instead (src/lib/gym/rules.ts).
+
+import { applyRules, type Adjustment, type GymRule, type PlanExercise } from "./rules";
 
 export type CycleStep = "base" | "plus_set" | "last_set_rir0" | "deload";
 
 export type BlockContext = {
   /** Monday of the week it applies to. */
   monday: string;
-  block: string;
+  /** Season block name (null: a coach-ruled week outside the season). */
+  block: string | null;
   gymFocus: string | null;
   step: CycleStep;
+  /** The coach's rules for this week (gym_week_rules): they replace the default ones. */
+  coach?: { rules: GymRule[]; note: string | null };
 };
 
 export type SeasonBlockInput = {
@@ -50,57 +56,45 @@ export function blockContext(blocks: SeasonBlockInput[], monday: string): BlockC
   return { ...base, step: "base" };
 }
 
-export type PlanExercise = {
-  id: string;
-  block: "main" | "finisher";
-  sets: number;
-  rir: number | null;
-  mechanic: string | null;
-  primaryMuscles: string[];
-};
-
-export type Adjustment = {
-  sets: number;
-  rir: number | null;
-  /** RIR for the last set only (accessories in the week before a deload). */
-  lastSetRir: number | null;
-  /** Holds the weight (deload: same weights, no extra reps). */
-  weight: "keep" | null;
-  note: string;
-};
-
-const UPPER = ["chest", "back", "shoulders", "biceps", "triceps"];
-const isUpper = (e: PlanExercise) => e.primaryMuscles.some((m) => UPPER.includes(m));
+export type { Adjustment, PlanExercise } from "./rules";
 
 export const DELOAD_RIR = 3;
 
-/** Per-exercise changes for this session (in template order), keyed by exercise id. */
-export function blockAdjustments(exercises: PlanExercise[], step: CycleStep): Map<string, Adjustment> {
-  const out = new Map<string, Adjustment>();
-  const main = exercises.filter((e) => e.block === "main");
-  const keep = (e: PlanExercise) => ({ sets: e.sets, rir: e.rir, lastSetRir: null, weight: null });
+/** The app's default block rules, used in weeks without coach rules. */
+export const DEFAULT_RULES: Record<CycleStep, GymRule[]> = {
+  base: [],
+  deload: [
+    { sets_factor: 0.5, min_rir: DELOAD_RIR, weight: "keep", note: "Lighter week: half the sets, same weights, RIR 3–4" },
+  ],
+  plus_set: [
+    {
+      match: { mechanic: "compound", region: "upper", limit: 2 },
+      sets_delta: 1,
+      note: "Block week: +1 set on the two upper-body compounds",
+    },
+  ],
+  last_set_rir0: [
+    { match: { mechanic: "isolation", region: "upper" }, last_set_rir: 0, note: "Block week: last set to RIR 0 before the deload" },
+  ],
+};
 
-  if (step === "deload") {
-    for (const e of main) {
-      out.set(e.id, {
-        sets: Math.max(1, Math.ceil(e.sets / 2)),
-        rir: Math.max(e.rir ?? DELOAD_RIR, DELOAD_RIR),
-        lastSetRir: null,
-        weight: "keep",
-        note: "Lighter week: half the sets, same weights, RIR 3–4",
-      });
-    }
-  } else if (step === "plus_set") {
-    for (const e of main.filter((x) => x.mechanic === "compound" && isUpper(x)).slice(0, 2)) {
-      out.set(e.id, { ...keep(e), sets: e.sets + 1, note: "Block week: +1 set on the two upper-body compounds" });
-    }
-  } else if (step === "last_set_rir0") {
-    for (const e of main.filter((x) => x.mechanic !== "compound" && isUpper(x))) {
-      out.set(e.id, { ...keep(e), lastSetRir: 0, note: "Block week: last set to RIR 0 before the deload" });
-    }
-  }
-  return out;
+/** Per-exercise changes for this session (default block rules), keyed by exercise id. */
+export function blockAdjustments(exercises: PlanExercise[], step: CycleStep): Map<string, Adjustment> {
+  return applyRules(exercises, DEFAULT_RULES[step]);
 }
+
+/** The coach's week rules on top of the season context (they win over the defaults). */
+export function withCoachRules(
+  ctx: BlockContext | null,
+  monday: string,
+  row: { rules: GymRule[]; note: string | null } | null,
+): BlockContext | null {
+  if (!row) return ctx;
+  return { ...(ctx ?? { monday, block: null, gymFocus: null, step: "base" as const }), coach: row };
+}
+
+/** The rules that apply this week: the coach's, else the default block rules. */
+export const weekRules = (ctx: BlockContext): GymRule[] => ctx.coach?.rules ?? DEFAULT_RULES[ctx.step];
 
 export const STEP_LABELS: Record<CycleStep, string> = {
   base: "template sets",

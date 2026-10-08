@@ -13,7 +13,9 @@ import {
 import { GymApp, type RecentWorkout } from "./gym-app";
 import { getActiveGoal } from "@/lib/queries";
 import { loadSeasons } from "@/lib/season/queries";
-import { blockContext } from "@/lib/gym/periodization";
+import { blockContext, withCoachRules } from "@/lib/gym/periodization";
+import { parseRules } from "@/lib/gym/rules";
+import { forFocus } from "@/lib/gym/templates";
 
 const HISTORY_DAYS = 180;
 
@@ -28,11 +30,11 @@ export default async function GymPage({ searchParams }: PageProps<"/gym">) {
   const monday = mondayOf(today);
   const supabase = await createClient();
 
-  const [tplRes, exRes, histRes, activeRes, week, blockCtx] = await Promise.all([
+  const [tplRes, exRes, histRes, activeRes, week, seasonCtx, rulesRes] = await Promise.all([
     supabase
       .from("workout_templates")
       .select(
-        "id, name, position, template_exercises(id, exercise_id, block, position, sets, rep_min, rep_max, target_rir, rest_seconds)",
+        "id, name, position, gym_focus, template_exercises(id, exercise_id, block, position, sets, rep_min, rep_max, target_rir, rest_seconds)",
       )
       .eq("archived", false)
       .order("position"),
@@ -70,7 +72,11 @@ export default async function GymPage({ searchParams }: PageProps<"/gym">) {
         return approved ? blockContext(approved.blocks, monday) : null;
       })
       .catch(() => null),
+    // The coach's rules for this week, if any (they replace the default block rules).
+    supabase.from("gym_week_rules").select("rules, note").eq("week_start", monday).maybeSingle(),
   ]);
+  const coachRules = rulesRes.data ? { rules: parseRules(rulesRes.data.rules).rules, note: rulesRes.data.note } : null;
+  const blockCtx = withCoachRules(seasonCtx, monday, coachRules);
   const loadError = tplRes.error ?? exRes.error ?? histRes.error ?? activeRes.error;
 
   const templates: TemplateInput[] = (tplRes.data ?? []).map((t) => ({
@@ -78,6 +84,8 @@ export default async function GymPage({ searchParams }: PageProps<"/gym">) {
     name: t.name,
     items: [...t.template_exercises].sort((a, b) => a.position - b.position),
   }));
+  // This block's templates (tagged for its gym focus, or untagged) lead and rotate.
+  const blockTemplateIds = forFocus(tplRes.data ?? [], seasonCtx?.gymFocus ?? null).map((t) => t.id);
 
   const exercises: ExerciseInfo[] = (exRes.data ?? []).map((e) => ({
     ...e,
@@ -129,6 +137,7 @@ export default async function GymPage({ searchParams }: PageProps<"/gym">) {
         index={week?.index ?? {}}
         planned={planned}
         blockCtx={blockCtx}
+        blockTemplateIds={blockTemplateIds}
       />
     </PageShell>
   );
