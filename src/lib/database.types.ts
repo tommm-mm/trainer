@@ -144,11 +144,13 @@ export type Database = {
       }
       checkins: {
         Row: {
+          calf_score: number | null
           created_at: string
           date: string
           feeling_score: number | null
           feeling_text: string | null
           id: string
+          niggle: string | null
           notes: string | null
           sleep_hours: number | null
           soreness: number | null
@@ -156,11 +158,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          calf_score?: number | null
           created_at?: string
           date: string
           feeling_score?: number | null
           feeling_text?: string | null
           id?: string
+          niggle?: string | null
           notes?: string | null
           sleep_hours?: number | null
           soreness?: number | null

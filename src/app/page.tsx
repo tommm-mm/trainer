@@ -37,6 +37,7 @@ import { AddSession } from "./week/add-session";
 import { SyncButton } from "./week/sync-button";
 import { FeedbackCard } from "./week/feedback-card";
 import { TodayCard } from "./week/today-card";
+import { QuickCheckin } from "./week/quick-checkin";
 
 export default async function WeekPage({ searchParams }: PageProps<"/">) {
   const { week } = await searchParams;
@@ -163,8 +164,8 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
   // Gentle nudge when there's no check-in in the last 4 days (today included).
   const lastCheckin = lastCheckinRes.data?.date ?? null;
   const daysSinceCheckin = lastCheckin ? daysBetween(lastCheckin, today) : null;
-  const showCheckinReminder =
-    isCurrentWeek && !lastCheckinRes.error && (daysSinceCheckin === null || daysSinceCheckin >= 4);
+  // The quick check-in shows on the current week until today has one.
+  const showQuickCheckin = isCurrentWeek && !lastCheckinRes.error && daysSinceCheckin !== 0;
 
   const plannedKm = plans.reduce((s, p) => s + (p.target_distance_km ?? 0), 0);
   const doneKm = activities
@@ -333,22 +334,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
         </section>
       )}
 
-      {showCheckinReminder && (
-        <Link
-          href="/checkin"
-          className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3"
-        >
-          <div className="text-sm">
-            <p className="font-medium text-emerald-300">How are you feeling?</p>
-            <p className="text-xs text-neutral-400">
-              {daysSinceCheckin === null
-                ? "No check-ins yet. Sleep, soreness and stress help read your training load."
-                : `Last check-in ${daysSinceCheckin} days ago. 30 seconds keeps the picture complete.`}
-            </p>
-          </div>
-          <span className="shrink-0 text-xs text-emerald-400">Check in →</span>
-        </Link>
-      )}
+      {showQuickCheckin && <QuickCheckin lastDaysAgo={daysSinceCheckin} />}
 
       <section className="mb-4 grid grid-cols-3 gap-2">
         <Stat label="Planned km" value={formatNumber(plannedKm)} />

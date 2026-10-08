@@ -86,6 +86,8 @@ export default async function CheckinPage({ searchParams }: PageProps<"/checkin"
           soreness: current?.soreness ?? null,
           stress: current?.stress ?? null,
           notes: current?.notes ?? null,
+          calf_score: current?.calf_score ?? null,
+          niggle: current?.niggle ?? null,
           weight_kg: currentBody?.weight_kg ?? null,
           body_fat_pct: currentBody?.body_fat_pct ?? null,
         }}
@@ -158,6 +160,8 @@ function summary(c: Tables<"checkins"> | null, b: Tables<"body_metrics"> | null)
     c?.sleep_hours != null ? `sleep ${formatNumber(c.sleep_hours)} h` : null,
     c?.soreness != null ? `sore ${c.soreness}` : null,
     c?.stress != null ? `stress ${c.stress}` : null,
+    c?.calf_score != null ? `calves ${c.calf_score}/3` : null,
+    c?.niggle ? `niggle: ${c.niggle.replace("_", " ")}` : null,
     b?.weight_kg != null ? `${formatNumber(b.weight_kg)} kg` : null,
     b?.body_fat_pct != null ? `${formatNumber(b.body_fat_pct)}% bf` : null,
   ]

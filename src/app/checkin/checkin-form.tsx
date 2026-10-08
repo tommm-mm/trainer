@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { btnPrimary, inputCls, labelCls } from "@/components/ui";
 import { isISODate } from "@/lib/dates";
+import { CalfNiggleFields } from "@/components/calf-niggle";
 import { saveCheckin } from "./actions";
 
 export type CheckinValues = {
@@ -13,6 +14,8 @@ export type CheckinValues = {
   soreness: number | null;
   stress: number | null;
   notes: string | null;
+  calf_score: number | null;
+  niggle: string | null;
   weight_kg: number | null;
   body_fat_pct: number | null;
 };
@@ -65,6 +68,8 @@ export function CheckinForm({
       <Scale name="feeling_score" label="Overall feeling" low="awful" high="great" value={values.feeling_score} />
       <Scale name="soreness" label="Muscle soreness" low="none" high="very sore" value={values.soreness} />
       <Scale name="stress" label="Stress" low="calm" high="very stressed" value={values.stress} />
+
+      <CalfNiggleFields calf={values.calf_score} niggle={values.niggle} />
 
       <label className={labelCls}>
         Sleep last night (hours)

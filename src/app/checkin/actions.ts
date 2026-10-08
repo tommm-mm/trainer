@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { isISODate } from "@/lib/dates";
+import { isISODate, todayISO } from "@/lib/dates";
+import { isNiggle, niggleFlag } from "@/lib/checkin";
 import {
   FormError,
   num,
@@ -30,6 +31,8 @@ export async function saveCheckin(
       soreness: num(form, "soreness", "Soreness", { min: 1, max: 10, int: true }),
       stress: num(form, "stress", "Stress", { min: 1, max: 10, int: true }),
       notes: text(form, "notes"),
+      calf_score: num(form, "calf_score", "Calves", { min: 0, max: 3, int: true }),
+      niggle: niggleField(form),
     };
     const body = {
       weight_kg: num(form, "weight_kg", "Weight", { min: 30, max: 250 }),
@@ -59,6 +62,8 @@ export async function saveCheckin(
       if (error) throw error;
     }
 
+    await syncNiggleFlag(supabase, date, checkin.calf_score, checkin.niggle, checkin.notes);
+
     // Clearing weight/body fat on an edit removes that day's measurement.
     if (hasBody) {
       const { error } = existingBody.data
@@ -69,6 +74,73 @@ export async function saveCheckin(
       const { error } = await supabase.from("body_metrics").delete().eq("id", existingBody.data.id);
       if (error) throw error;
     }
+  } catch (err) {
+    return toErrorState(err);
+  }
+  revalidatePath("/", "layout");
+  return { error: null, ok: true };
+}
+
+function niggleField(form: FormData): string | null {
+  const v = text(form, "niggle");
+  if (v && !isNiggle(v)) throw new FormError("Unknown niggle area.");
+  return v;
+}
+
+type DB = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * Keeps that day's `niggle` flag in line with the check-in: opened (or
+ * updated) when calves ≥ 2 or a niggle is set, removed when you correct it
+ * to nothing. Resolved flags are never touched.
+ */
+async function syncNiggleFlag(
+  supabase: DB,
+  date: string,
+  calf: number | null,
+  niggle: string | null,
+  notes: string | null,
+) {
+  const description = niggleFlag(calf, niggle, notes);
+  const { data: open, error } = await supabase
+    .from("flags")
+    .select("id")
+    .eq("date", date)
+    .eq("type", "niggle")
+    .eq("resolved", false)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const res = description
+    ? open
+      ? await supabase.from("flags").update({ description }).eq("id", open.id)
+      : await supabase.from("flags").insert({ date, type: "niggle", description })
+    : open
+      ? await supabase.from("flags").delete().eq("id", open.id)
+      : { error: null };
+  if (res.error) throw res.error;
+}
+
+/** The Week View's 10-second check-in: calves and a niggle for today. */
+export async function quickCheckin(_prev: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const date = todayISO();
+    const calf_score = num(form, "calf_score", "Calves", { min: 0, max: 3, int: true });
+    if (calf_score === null) throw new FormError("Pick how your calves feel.");
+    const niggle = niggleField(form);
+    const supabase = await createClient();
+    const { data: existing, error } = await supabase
+      .from("checkins")
+      .select("id, notes")
+      .eq("date", date)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    const res = existing
+      ? await supabase.from("checkins").update({ calf_score, niggle }).eq("id", existing.id)
+      : await supabase.from("checkins").insert({ date, calf_score, niggle });
+    if (res.error) throw res.error;
+    await syncNiggleFlag(supabase, date, calf_score, niggle, existing?.notes ?? null);
   } catch (err) {
     return toErrorState(err);
   }
