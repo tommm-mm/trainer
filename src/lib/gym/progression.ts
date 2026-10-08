@@ -20,7 +20,7 @@
 //           under the range but easier than target, push to the target RIR
 
 import type { HistorySet, LastTime, LocalExercise, Measure, Target } from "./workout";
-import type { Adjustment } from "./periodization";
+import type { Adjustment } from "./rules";
 
 export type WeightDirection = "add" | "same" | "keep" | "lower";
 
@@ -155,27 +155,36 @@ export function withBlock(
   target: Target | null,
 ): Advice | null {
   if (!adjust) return advice;
-  if (advice) {
-    // A deload holds the weight (no extra reps), but never overrides "lower".
-    const hold = adjust.weight === "keep" && advice.weight !== "lower";
+  const repMin = adjust.repMin ?? advice?.repMin ?? target?.repMin ?? null;
+  const repMax = Math.max(adjust.repMax ?? advice?.repMax ?? target?.repMax ?? 0, repMin ?? 0) || null;
+  const clamp = (r: number) => (repMin == null || repMax == null ? r : Math.max(repMin, Math.min(repMax, r)));
+  if (advice && repMin != null && repMax != null) {
+    // "keep" (a deload) holds the weight, no extra reps, but never overrides "lower";
+    // an explicit "add" / "lower" from the week's rules wins.
+    const weight =
+      adjust.weight === "keep" ? (advice.weight === "lower" ? "lower" : "keep") : (adjust.weight ?? advice.weight);
+    const aimReps = weight === advice.weight ? clamp(advice.aimReps) : clamp(repMin);
     return {
       ...advice,
       sets: adjust.sets,
       rir: adjust.rir,
+      repMin,
+      repMax,
       lastSetRir: adjust.lastSetRir,
-      weight: hold ? "keep" : advice.weight,
-      aimReps: hold ? advice.repMin : advice.aimReps,
+      weight,
+      aimReps: weight === "keep" ? repMin : aimReps,
       blockNote: adjust.note,
     };
   }
-  if (!target || target.repMin == null || target.repMax == null) return null;
+  if (repMin == null || repMax == null) return null;
   return {
+    // No history: there's no weight to move yet.
     weight: "keep",
     sets: adjust.sets,
-    repMin: target.repMin,
-    repMax: target.repMax,
+    repMin,
+    repMax,
     rir: adjust.rir,
-    aimReps: target.repMin,
+    aimReps: repMin,
     reason: "",
     basedOn: null,
     repsOnly: false,

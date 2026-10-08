@@ -219,8 +219,72 @@ change (the app refuses). Kinds and `payload`:
 | `template_exercise_update` | `{ template_exercise_id, sets?, rep_min?, rep_max?, target_rir?, rest_seconds?, notes? }` |
 | `template_exercise_swap` | `{ template_exercise_id, exercise_id }` |
 | `template_exercise_remove` | `{ template_exercise_id }` (history is kept) |
-| `template_create` | `{ name, notes?, items: [{ exercise_id, block?, sets, rep_min, rep_max, target_rir, rest_seconds?, notes? }] }` (e.g. the Build strength templates) |
+| `template_create` | `{ name, notes?, gym_focus?, items: [{ exercise_id, block?, sets, rep_min, rep_max, target_rir, rest_seconds?, notes? }] }` |
 | `template_archive` | `{ template_id }` (history is kept) |
+| `template_update` | `{ template_id, name?, notes?, gym_focus?, archived? }`: rename, re-tag, archive (`true`) or restore (`false`) |
+| `exercise_create` | `{ name, primary_muscles, secondary_muscles?, equipment, mechanic, measure?, is_main_lift?, weight_step_kg? }`: a new exercise in his library |
+| `gym_rules_set` | `{ weeks: [{ week_start, rules, note? }] }`: your per-week changes to the templates (see "Gym tools") |
+
+Values: muscles ∈ chest, back, shoulders, biceps, triceps, quads, hamstrings, glutes, calves, core;
+`equipment` ∈ barbell, dumbbell, machine, cable, bodyweight, kettlebell, other; `mechanic` ∈
+compound, isolation; `measure` ∈ reps (default), time; `gym_focus` = a list from hypertrophy,
+strength, power, maintenance, off (`null` = every block).
+
+### Gym tools: you design the program, the app runs it
+
+You decide exercises, sets, reps, RIR, rests and how they change week to week. The app only stores
+what Tommaso approved and turns it into suggestions in the logger (he accepts per exercise and
+always picks the kilos).
+
+- **Templates belong to blocks.** Tag each template with the block gym focuses it's for
+  (`gym_focus`). The Gym tab offers, rotates and checks the current block's templates (the season
+  block's `gym_focus`); the others stay under "Other workouts". Untagged = every block. So you can
+  create next block's templates weeks in advance: they appear when the block starts. Tag the old
+  ones too (`template_update`), or archive them when they're done.
+- **New exercises:** `exercise_create` first (apply it, read its id), then use it in templates.
+- **Week rules** (`gym_rules_set`): how a week changes the templates. A week with your rules uses
+  them **instead of** the app's default block rules (deload in lighter weeks; in hypertrophy
+  blocks +1 set and last set to RIR 0 before it). `rules: []` = templates exactly as written;
+  `rules: null` = back to the default. Weeks are Mondays; past weeks can't change. You can set a
+  whole block in one proposal.
+
+  A rule = `match` (which exercises) + changes. Rules run in order, each on the result of the
+  previous ones; exercises no rule matches keep the template.
+
+  | `match` key | meaning |
+  |---|---|
+  | `block` | `main` (default), `finisher`, `any` |
+  | `mechanic` | `compound`, `isolation` |
+  | `region` | `upper` (chest, back, shoulders, biceps, triceps), `lower` (quads, hamstrings, glutes, calves) |
+  | `muscles` | any of these primary muscles |
+  | `exercise_ids`, `template_ids` | specific exercises / templates |
+  | `limit` | only the first N matches in the session (template order) |
+
+  | change | meaning |
+  |---|---|
+  | `sets`, `sets_delta`, `sets_factor` | set count, ± sets, × sets (rounded up); never below 1 |
+  | `rir`, `rir_delta`, `min_rir`, `max_rir` | target RIR, ± RIR, floor, cap |
+  | `last_set_rir` | RIR on the last set only |
+  | `rep_min`, `rep_max` | this week's rep range |
+  | `weight` | `keep` (hold the weights; never overrides a "lower" from progression), `add`, `lower` |
+  | `note` | one line shown in the logger and saved with what he accepts |
+
+  ```sql
+  -- example shape only (the content is yours): one week, compounds 4–6 @ RIR 3, legs never below RIR 2
+  insert into coach_proposals (user_id, kind, payload, title, rationale, source)
+  values ('fae76b55-46c7-410d-b348-1f7daf7ffd00', 'gym_rules_set',
+    '{"weeks":[{"week_start":"2026-11-30","note":"Build wk 1","rules":[
+       {"match":{"mechanic":"compound"},"rep_min":4,"rep_max":6,"rir":3},
+       {"match":{"region":"lower"},"min_rir":2}]}]}'::jsonb,
+    'Build 1 week rules', '<why>', 'cowork');
+  -- what's set
+  select week_start, note, rules from gym_week_rules where week_start >= current_date - 7 order by week_start;
+  ```
+
+  The card shows the rules in words; a typo (unknown key, bad value) shows as an error and the
+  proposal can only be rejected, so fix it and propose again. Between weeks, double progression
+  still judges each lift on its last session against the template's range: when your rules change
+  the rep range or load from one week to the next, set `weight` explicitly for the week after.
 
 ```sql
 -- ids you need: sessions, template exercises, the exercise library
@@ -379,8 +443,9 @@ Sunday long run.
 
 The gym logger applies this table as suggestions (computed from the approved season's lighter
 weeks; he accepts per exercise): +1 set, last set to RIR 0, deload. You don't need to write
-exercise targets for it. Build (30 Nov) needs new strength templates (2×, 3×4–6 @ RIR 2): propose
-them to Tommaso in November.
+exercise targets for it. Build (30 Nov) needs its templates and, if you want more than double
+progression plus the deload, its week rules: design them, propose them to Tommaso in November
+(tag them `strength` so they appear on 30 Nov; tag A/B/C `hypertrophy`), see "Gym tools".
 
 | Week of | Running | Gym |
 |---|---|---|

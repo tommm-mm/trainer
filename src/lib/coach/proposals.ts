@@ -4,6 +4,8 @@
 
 import { formatDay } from "@/lib/dates";
 import { sessionLabel } from "@/lib/sessions";
+import { describeRules, parseRules } from "@/lib/gym/rules";
+import { focusLabel } from "@/lib/gym/templates";
 
 export const PROPOSAL_KINDS = [
   "session_update",
@@ -14,6 +16,9 @@ export const PROPOSAL_KINDS = [
   "template_exercise_remove",
   "template_create",
   "template_archive",
+  "template_update",
+  "exercise_create",
+  "gym_rules_set",
 ] as const;
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
 
@@ -33,6 +38,8 @@ export type ProposalContext = {
     { template: string; exercise: string; sets: number; rep_min: number | null; rep_max: number | null; target_rir: number | null }
   >;
   exercises: Map<string, string>;
+  /** Block tags of each template (template_update's before). */
+  templateFocus?: Map<string, string[] | null>;
 };
 
 type Payload = Record<string, unknown>;
@@ -103,10 +110,47 @@ export function describeProposal(
       return te ? { before: `${te.template}: ${te.exercise} ${prescription(te)}`, after: "removed" } : missing("exercise");
     case "template_create": {
       const items = Array.isArray(payload.items) ? (payload.items as Payload[]) : [];
+      const focus = Array.isArray(payload.gym_focus) ? ` (${focusLabel(payload.gym_focus as string[])})` : "";
       return {
         before: null,
-        after: `New template "${str(payload.name) ?? "?"}": ${items.map((i) => `${exercise(i.exercise_id)} ${prescription(i)}`).join(" · ")}`,
+        after: `New template "${str(payload.name) ?? "?"}"${focus}: ${items.map((i) => `${exercise(i.exercise_id)} ${prescription(i)}`).join(" · ")}`,
       };
+    }
+    case "template_update": {
+      const id = str(payload.template_id) ?? "";
+      if (!ctx.templates.has(id)) return missing("template");
+      const cur = ctx.templateFocus?.get(id) ?? null;
+      const changes = [
+        str(payload.name) ? `renamed "${str(payload.name)}"` : null,
+        "gym_focus" in payload ? `for ${focusLabel(payload.gym_focus as string[] | null)}` : null,
+        payload.archived === true ? "archived (history kept)" : payload.archived === false ? "restored" : null,
+        "notes" in payload ? "new notes" : null,
+      ].filter(Boolean);
+      return { before: `${template(id)} (for ${focusLabel(cur)})`, after: changes.join(", ") || "no change" };
+    }
+    case "exercise_create": {
+      const muscles = Array.isArray(payload.primary_muscles) ? (payload.primary_muscles as string[]).join("/") : "?";
+      return {
+        before: null,
+        after: `New exercise "${str(payload.name) ?? "?"}": ${muscles}, ${str(payload.equipment) ?? "?"}, ${str(payload.mechanic) ?? "?"}`,
+      };
+    }
+    case "gym_rules_set": {
+      const weeks = Array.isArray(payload.weeks) ? (payload.weeks as Payload[]) : [];
+      if (weeks.length === 0) return { before: null, after: "", error: "No weeks in this change." };
+      const names = { exercises: ctx.exercises, templates: ctx.templates };
+      const lines: string[] = [];
+      for (const w of weeks) {
+        const day = str(w.week_start) ? `Week of ${formatDay(str(w.week_start)!)}` : "Week ?";
+        if (w.rules === null || w.rules === undefined) {
+          lines.push(`${day}: back to the default block rules`);
+          continue;
+        }
+        const { rules, errors } = parseRules(w.rules);
+        if (errors.length) return { before: null, after: "", error: `${day}: ${errors.join("; ")}` };
+        lines.push(`${day}: ${describeRules(rules, names)}${str(w.note) ? ` (${str(w.note)})` : ""}`);
+      }
+      return { before: null, after: lines.join("\n") };
     }
     case "template_archive":
       return ctx.templates.has(str(payload.template_id) ?? "")

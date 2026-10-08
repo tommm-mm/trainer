@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import { btnPrimary, btnSecondary, inputCls, labelCls } from "@/components/ui";
-import { addItem, createTemplate, renameTemplate, updateItem } from "./actions";
+import { GYM_FOCUSES } from "@/lib/gym/templates";
+import { addItem, createTemplate, renameTemplate, setTemplateFocus, updateItem } from "./actions";
 
 const small = "w-full rounded-lg border border-neutral-800 bg-neutral-950 px-2 py-2 text-center text-base tabular-nums outline-none focus:border-emerald-500";
 
@@ -27,6 +28,33 @@ export function RenameForm({ id, name }: { id: string; name: string }) {
       <button disabled={pending} className={`${btnSecondary} shrink-0`}>
         {pending ? "…" : state.ok ? "✓" : "Rename"}
       </button>
+    </form>
+  );
+}
+
+/** Block tags: the Gym tab and the Today card offer this template in those blocks. */
+export function FocusForm({ id, focus }: { id: string; focus: string[] | null }) {
+  const [state, action, pending] = useActionState(setTemplateFocus.bind(null, id), { error: null });
+  return (
+    <form action={action} className="flex flex-col gap-2">
+      <p className="text-xs text-neutral-400">
+        Used in blocks with gym focus (none ticked = every block). Other templates stay available under
+        &quot;Other workouts&quot;.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {GYM_FOCUSES.map((f) => (
+          <label key={f} className="flex items-center gap-1.5 rounded-lg border border-neutral-800 px-2.5 py-1.5 text-sm">
+            <input type="checkbox" name={f} defaultChecked={!!focus?.includes(f)} className="accent-emerald-500" />
+            {f}
+          </label>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <button disabled={pending} className={`${btnSecondary} shrink-0`}>
+          {pending ? "…" : state.ok ? "✓ Saved" : "Save blocks"}
+        </button>
+        {state.error && <p className="text-xs text-red-400">{state.error}</p>}
+      </div>
     </form>
   );
 }

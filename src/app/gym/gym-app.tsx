@@ -24,7 +24,8 @@ import {
   acceptAllAdvice,
 } from "@/lib/gym/workout";
 import { pendingAdvice } from "@/lib/gym/progression";
-import { blockAdjustments, STEP_LABELS, type BlockContext } from "@/lib/gym/periodization";
+import { STEP_LABELS, weekRules, type BlockContext } from "@/lib/gym/periodization";
+import { applyRules, describeRules } from "@/lib/gym/rules";
 import { mondayOf } from "@/lib/dates";
 import { ExerciseCard } from "./exercise-card";
 import { ExercisePicker } from "./exercise-picker";
@@ -58,6 +59,8 @@ type Props = {
   planned: { planId: string | null; templateId: string | null } | null;
   /** This week in the approved season (gym periodization), null outside a season. */
   blockCtx?: BlockContext | null;
+  /** The current block's templates (they lead and rotate); the rest show as "Other workouts". */
+  blockTemplateIds?: string[] | null;
 };
 
 const uuid = () => crypto.randomUUID();
@@ -72,6 +75,7 @@ export function GymApp({
   index,
   planned,
   blockCtx = null,
+  blockTemplateIds = null,
 }: Props) {
   const router = useRouter();
   const onDone = useCallback(() => router.refresh(), [router]);
@@ -107,6 +111,7 @@ export function GymApp({
     return (
       <Home
         templates={templates}
+        blockTemplateIds={blockTemplateIds}
         byId={byId}
         recent={recent}
         finished={finished}
@@ -152,6 +157,7 @@ export function GymApp({
 
 function Home({
   templates,
+  blockTemplateIds,
   byId,
   recent,
   finished,
@@ -161,6 +167,7 @@ function Home({
   onDismiss,
 }: {
   templates: TemplateInput[];
+  blockTemplateIds: string[] | null;
   byId: Map<string, ExerciseInfo>;
   recent: RecentWorkout[];
   finished: { linked: boolean } | null;
@@ -169,12 +176,20 @@ function Home({
   onStart: (t: TemplateInput | null, planId: string | null) => void;
   onDismiss: () => void;
 }) {
-  // A planned session picks the template; otherwise rotate after the last one done.
-  const rotation = nextTemplate(templates, recent.find((r) => r.templateId)?.templateId ?? null);
+  // A planned session picks the template; otherwise rotate (within this block's
+  // templates) after the last one of them done.
+  const inBlock = (t: TemplateInput) => !blockTemplateIds || blockTemplateIds.includes(t.id);
+  const block = templates.filter(inBlock);
+  const rotation = nextTemplate(
+    block,
+    recent.find((r) => r.templateId && block.some((t) => t.id === r.templateId))?.templateId ?? null,
+  );
   const nextId = planned?.templateId ?? rotation?.id ?? null;
   const planId = planned?.planId ?? null;
-  // The suggested workout goes first.
-  const ordered = [...templates].sort((a, b) => Number(b.id === nextId) - Number(a.id === nextId));
+  // The suggested workout goes first, then this block's, then the others.
+  const rank = (t: TemplateInput) => (t.id === nextId ? 0 : inBlock(t) ? 1 : 2);
+  const ordered = [...templates].sort((a, b) => rank(a) - rank(b));
+  const firstOther = ordered.find((t) => rank(t) === 2)?.id;
 
   return (
     <div className="flex flex-col gap-4">
@@ -209,6 +224,9 @@ function Home({
           const fin = t.items.filter((i) => i.block === "finisher");
           return (
             <li key={t.id} className={`${cardCls} ${t.id === nextId ? "border-emerald-500/50" : ""}`}>
+              {t.id === firstOther && (
+                <p className="-mt-1 mb-2 text-[11px] uppercase tracking-wide text-neutral-500">Other workouts (not this block)</p>
+              )}
               <div className="mb-1 flex items-center justify-between gap-2">
                 <h2 className="font-semibold">{t.name}</h2>
                 {t.id === nextId && (
@@ -340,16 +358,20 @@ function ActiveWorkout({
   // The season block's change for this session (only for a workout in that week).
   const ctx = blockCtx && blockCtx.monday === mondayOf(doc.date) ? blockCtx : null;
   const adjustments = ctx
-    ? blockAdjustments(
+    ? applyRules(
         doc.exercises.map((e) => ({
           id: e.id,
+          exerciseId: e.exerciseId,
           block: e.block,
           sets: e.target?.sets ?? 0,
           rir: e.target?.rir ?? null,
+          repMin: e.target?.repMin ?? null,
+          repMax: e.target?.repMax ?? null,
           mechanic: byId.get(e.exerciseId)?.mechanic ?? null,
           primaryMuscles: byId.get(e.exerciseId)?.primary_muscles ?? [],
         })).filter((e) => e.sets > 0),
-        ctx.step,
+        weekRules(ctx),
+        doc.templateId ?? null,
       )
     : new Map();
   const pending = Object.fromEntries(
@@ -387,9 +409,11 @@ function ActiveWorkout({
         <p className="py-6 text-center text-sm text-neutral-500">No exercises yet. Add one below.</p>
       )}
 
-      {ctx && ctx.step !== "base" && (
+      {ctx && (ctx.coach || ctx.step !== "base") && (
         <p className="text-xs text-sky-300">
-          {ctx.block} · this week: {STEP_LABELS[ctx.step]}
+          {[ctx.block, ctx.coach ? `this week (coach): ${ctx.coach.note ?? describeRules(ctx.coach.rules)}` : `this week: ${STEP_LABELS[ctx.step]}`]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       )}
 
