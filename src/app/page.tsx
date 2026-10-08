@@ -38,6 +38,7 @@ import { SyncButton } from "./week/sync-button";
 import { FeedbackCard } from "./week/feedback-card";
 import { TodayCard } from "./week/today-card";
 import { QuickCheckin } from "./week/quick-checkin";
+import { RunDetailView } from "@/components/run-detail";
 
 export default async function WeekPage({ searchParams }: PageProps<"/">) {
   const { week } = await searchParams;
@@ -481,14 +482,17 @@ function DayCard({
           <div className="rounded-lg border border-neutral-800 px-3 py-2 text-xs text-neutral-300">
             <p className="mb-1 text-[11px] uppercase tracking-wide text-neutral-500">Logged</p>
             {runs.map((r) => (
-              <p key={r.id}>
-                🏃 {r.name ? `${r.name} · ` : ""}
-                {formatNumber(r.distance_km)} km
-                {r.avg_pace && ` · ${r.avg_pace}/km`}
-                {r.avg_hr && ` · ${r.avg_hr} bpm`}
-                {r.source === "garmin" && <span className="text-neutral-500"> · Garmin</span>}
-                {r.feeling_score && <span className="text-sky-300"> · feel {r.feeling_score}/10</span>}
-              </p>
+              <div key={r.id}>
+                <p>
+                  🏃 {r.name ? `${r.name} · ` : ""}
+                  {formatNumber(r.distance_km)} km
+                  {r.avg_pace && ` · ${r.avg_pace}/km`}
+                  {r.avg_hr && ` · ${r.avg_hr} bpm`}
+                  {r.source === "garmin" && <span className="text-neutral-500"> · Garmin</span>}
+                  {r.feeling_score && <span className="text-sky-300"> · feel {r.feeling_score}/10</span>}
+                </p>
+                <RunDetailView detail={r.run_detail} />
+              </div>
             ))}
             {garminGym.map((g) => (
               <p key={g.id}>

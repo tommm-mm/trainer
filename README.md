@@ -22,6 +22,7 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | C2d | Gym questions on the Week View: upper-body volume gaps (< 10 hard sets/week in hypertrophy blocks) and stalled lifts (4 sessions, ≥ 3 weeks) → add / swap an exercise, only on Yes | ✅ |
 | Q | Quick check-in on the Week View (calves 0–3 + one niggle area, 10 s, until today has one); calves ≥ 2 or a niggle opens a `niggle` flag; views `weekly_muscle_sets`, `easy_runs` for Cowork | ✅ |
 | CK | Draft checks for coaches in SQL: `check_season_draft(goal, draft)` (validation + guardrails) and `check_week(monday, draft?)` (week checks, dry run). Same rules as `model.ts` / `load.ts` / `week-checks.ts`: the shared cases in `src/lib/checks.fixtures.json` are asserted on the TS in `npm test` and on the SQL by `npm run parity:sql` (needs a Postgres with the migrations; see `scripts/sql-parity.mjs`). **Change a rule in one place → change both and re-run both.** | ✅ |
+| RD | Run detail from the sync: km splits (pace, HR), HR drift (Friel's aerobic decoupling, runs ≥ 40′) and watch laps (intervals.icu intervals, best effort) in `activities.run_detail`; folded "Splits · laps · HR drift" under each run on the Week View; views `run_details`, `run_splits` for Cowork. 10 runs per sync, newest first (`src/lib/run-detail.ts`) | ✅ (verify on live after deploy) |
 | C2e | Week generator from season targets + free days (with D1) | ⏳ |
 | D0 | Coach inbox (`coach_proposals`): Cowork can propose any change (move / change / cancel a session, add / swap / change / remove a template exercise, new or archived templates), approved on the Week View, applied atomically by `apply_coach_proposal` | ✅ (restricted DB role for coaches: later) |
 | W | Garmin wellness sync (VO₂max, HRV, resting HR, sleep, CTL/ATL) → Stats › Fitness | ⏳ |
@@ -43,6 +44,7 @@ Garmin Connect → intervals.icu (their side) → `POST /api/sync` → `activiti
 - Same-day manual gym logs → `garmin_confirmed = true`.
 - Completed gym workouts → linked to the longest same-day `gym` activity (`workouts.activity_id`); the session RPE is copied onto it.
 - Each synced workout shows a feedback card (feeling, RPE, notes). "Pain" creates a `pain_reported` flag.
+- **Run detail:** each Garmin run also gets km splits, HR drift and its watch laps (`activities.run_detail`, `src/lib/run-detail.ts`): one streams call (time, distance, HR) plus the intervals call, 10 runs per sync, newest first. `{}` = no streams; a failed call retries next sync.
 - **HR streams:** runs and bike/swim get their intervals.icu HR stream stored as a histogram (`activities.hr_hist`, seconds per bpm; `{}` = no HR). Up to 20 per sync, newest first, so history backfills over a few syncs.
 - **Settings:** each sync refreshes `athlete_settings` (rest/max HR, planned-load calibration). The threshold HR in that row is only ever set by you (Season → Efforts). Streams and settings never fail a sync.
 

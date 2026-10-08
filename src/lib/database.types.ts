@@ -33,6 +33,7 @@ export type Database = {
           max_hr: number | null
           name: string | null
           rpe: number | null
+          run_detail: Json | null
           source: string
           sport_type: string | null
           type: string
@@ -56,6 +57,7 @@ export type Database = {
           max_hr?: number | null
           name?: string | null
           rpe?: number | null
+          run_detail?: Json | null
           source: string
           sport_type?: string | null
           type: string

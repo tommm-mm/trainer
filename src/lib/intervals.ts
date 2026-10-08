@@ -5,6 +5,7 @@
 import type { TablesInsert } from "@/lib/database.types";
 import { paceFromRun } from "@/lib/format";
 import { histogramFromStream, type HrHistogram } from "@/lib/zones";
+import { decoupling, kmSplits, parseLaps, type RunDetail } from "@/lib/run-detail";
 
 const BASE_URL = "https://intervals.icu/api/v1";
 // Not a secret (it's in the intervals.icu profile URL); env var overrides it.
@@ -114,6 +115,37 @@ export async function fetchHrHistogram(activityId: string): Promise<HrHistogram 
   const hr = streams.find((s) => s.type === "heartrate")?.data;
   const time = streams.find((s) => s.type === "time")?.data;
   return hr?.length ? histogramFromStream(hr, time ?? null) : null;
+}
+
+/**
+ * Splits, HR drift and laps of one run: the time / distance / heartrate
+ * streams, plus the activity's intervals (watch laps) best effort. Null when
+ * the activity has no streams. Throws on HTTP errors of the streams so the
+ * caller retries on the next sync; a failed laps request only drops the laps.
+ */
+export async function fetchRunDetail(activityId: string): Promise<RunDetail | null> {
+  const id = encodeURIComponent(activityId);
+  const res = await fetch(`${BASE_URL}/activity/${id}/streams.json?types=time,distance,heartrate`, {
+    headers: authHeaders(),
+    cache: "no-store",
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`intervals.icu streams ${activityId}: ${res.status} ${(await res.text()).slice(0, 120)}`);
+  const streams = (await res.json()) as IntervalsStream[];
+  const get = (t: string) => streams.find((s) => s.type === t)?.data ?? null;
+  const [time, dist, hr] = [get("time"), get("distance"), get("heartrate")];
+  if (!time?.length || !dist?.length) return null;
+  const hrs = hr ?? time.map(() => null);
+
+  let laps = null;
+  try {
+    const r = await fetch(`${BASE_URL}/activity/${id}/intervals`, { headers: authHeaders(), cache: "no-store" });
+    if (r.ok) laps = parseLaps(await r.json());
+    else console.error(`[intervals] laps ${activityId}: ${r.status}`);
+  } catch (err) {
+    console.error("[intervals] laps failed:", err instanceof Error ? err.message : err);
+  }
+  return { splits: kmSplits(time, dist, hrs), decoupling: decoupling(time, dist, hrs), laps };
 }
 
 type IntervalsAthlete = {

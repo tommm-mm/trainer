@@ -193,6 +193,12 @@ where week_start >= date_trunc('week', current_date)::date - 21 order by week_st
 -- higher = fitter) and pace at 65% HRR (s/km, lower = fitter). Read the trend over weeks, not one run.
 select week_start, count(*) runs, round(avg(ef), 3) ef, round(avg(pace_at_65_hrr_s_per_km)) pace_at_65_hrr
 from easy_runs where date >= current_date - 84 group by week_start order by week_start;
+-- per run: HR drift (Friel's aerobic decoupling, runs ≥ 40′: < 5% = the base held, ≥ 5% = HR drifted
+-- up at the same pace) and how many km splits / watch laps it has. Filled by the sync, newest first.
+select date, name, km, avg_hr, rpe, decoupling, splits, laps from run_details where date >= current_date - 28 order by date;
+-- the splits and laps of one run (the 8×1′ reps, the time trial): kind = 'split' (n = km mark) or 'lap'
+select kind, n, km, seconds, pace_s_per_km, hr, max_hr, label, work from run_splits
+where activity_id = '<activity id>' order by kind, n;
 -- gym suggestions he accepted this and last week (the app proposes sets × reps @ RIR + add/same/lower weight)
 select x.week_start, t.name template, e.name exercise, x.sets, x.rep_min, x.rep_max, x.target_rir, x.rationale
 from exercise_targets x join template_exercises te on te.id = x.template_exercise_id

@@ -4,9 +4,9 @@
 // The SQL views Cowork reads use the same row, so both see the same numbers.
 
 import type { DB } from "@/lib/queries";
-import type { Tables } from "@/lib/database.types";
+import type { Json, Tables } from "@/lib/database.types";
 import { addDays, mondayOf } from "@/lib/dates";
-import { fetchHrHistogram, fetchHrSettings } from "@/lib/intervals";
+import { fetchHrHistogram, fetchHrSettings, fetchRunDetail } from "@/lib/intervals";
 import {
   resolveHrAnchors,
   sessionLoads,
@@ -159,6 +159,47 @@ export async function fillHrHistograms(supabase: DB, limit = HR_STREAMS_PER_SYNC
           filled++;
         } catch (err) {
           console.error("[sync] HR stream failed:", err instanceof Error ? err.message : err);
+        }
+      }),
+    );
+  }
+  return filled;
+}
+
+/** Run details (splits, drift, laps) fetched per sync: newest first, history backfills. */
+export const RUN_DETAILS_PER_SYNC = 10;
+
+/**
+ * Splits, HR drift and laps for Garmin runs that don't have them yet. A run
+ * without streams is stored as `{}` so it isn't fetched again; a failed
+ * request is retried on the next sync.
+ */
+export async function fillRunDetails(supabase: DB, limit = RUN_DETAILS_PER_SYNC): Promise<number> {
+  const { data, error } = await supabase
+    .from("activities")
+    .select("id, external_id")
+    .eq("source", "garmin")
+    .eq("type", "run")
+    .not("external_id", "is", null)
+    .is("run_detail", null)
+    .order("date", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  let filled = 0;
+  const todo = data ?? [];
+  for (let i = 0; i < todo.length; i += STREAM_CONCURRENCY) {
+    await Promise.all(
+      todo.slice(i, i + STREAM_CONCURRENCY).map(async (a) => {
+        try {
+          const d = await fetchRunDetail(a.external_id!);
+          const { error: upErr } = await supabase
+            .from("activities")
+            .update({ run_detail: (d ?? {}) as Json })
+            .eq("id", a.id);
+          if (upErr) throw upErr;
+          filled++;
+        } catch (err) {
+          console.error("[sync] run detail failed:", err instanceof Error ? err.message : err);
         }
       }),
     );
