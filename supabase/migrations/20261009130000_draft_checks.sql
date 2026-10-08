@@ -14,7 +14,7 @@
 -- guardrails), src/lib/load.ts (planned load), src/lib/week-checks.ts.
 -- Change one, change the other: the shared cases in
 -- src/lib/checks.fixtures.json are asserted against the TS in vitest
--- (checks-parity.test.ts) and against this SQL by scripts/sql-parity.sh.
+-- (checks-parity.test.ts) and against this SQL by scripts/sql-parity.mjs.
 -- Differences: load history comes from the weekly_load view (median RPE over
 -- all history; the app uses the last 16 weeks).
 
@@ -347,8 +347,6 @@ declare
   v_heavy uuid[];
   r record;
   a record;
-  bb record;
-  v_gap int;
   v_runs int; v_gym_days int; v_quality int; v_km numeric; v_all_km boolean; v_long boolean; v_maxq int;
 begin
   -- the approved season week and its block's gym focus
