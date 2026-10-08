@@ -12,7 +12,7 @@ export default async function AnalyticsPage() {
   const today = todayISO();
 
   const supabase = await createClient();
-  const [actsRes, firstRes, bodyRes, hr, strength] = await Promise.all([
+  const [actsRes, firstRes, bodyRes, hr, strength, wellRes] = await Promise.all([
     supabase
       .from("activities")
       .select("date, type, distance_km, duration_min, avg_hr, max_hr, rpe")
@@ -27,6 +27,7 @@ export default async function AnalyticsPage() {
       .order("date"),
     fetchHrSettings(addDays(today, -30), today),
     loadStrength(supabase, { from: statsFrom(today), to: today }).catch(() => null),
+    supabase.from("wellness").select("date, hrv, resting_hr, sleep_s").gte("date", statsFrom(today)).lte("date", today).order("date"),
   ]);
   const loadError = actsRes.error ?? firstRes.error ?? bodyRes.error;
   const historyStart = firstRes.data?.date ?? null;
@@ -40,6 +41,7 @@ export default async function AnalyticsPage() {
     gym: strength
       ? { sessions: strength.sessions, index: strength.index, target: Math.max(strength.activeTemplates, 1) }
       : undefined,
+    wellness: (wellRes.data ?? []).map((w) => ({ ...w, hrv: w.hrv === null ? null : Number(w.hrv) })),
   });
   const shortHistory = !historyStart || daysBetween(historyStart, today) < WEEKS * 7;
 

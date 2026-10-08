@@ -148,6 +148,12 @@ from activities where date >= current_date - 7 order by date;
 -- calf_score: 0 nothing, 1 I feel them, 2 tight / sore, 3 it limits me; niggle = one body area.
 -- The Week View asks calves + niggle every day (10 s); calves ≥ 2 or a niggle opens a `niggle` flag.
 select date, calf_score, niggle, feeling_score, sleep_hours, soreness, stress, feeling_text, notes from checkins where date >= current_date - 14 order by date;
+-- Garmin recovery (synced daily): last night + the 7-day means vs the 28-day baseline before them.
+-- The app warns (Week View "Recovery" card) when hrv_7d < hrv_base − 0.5 × hrv_base_sd (HRV-guided
+-- training's smallest worthwhile change), rhr_7d ≥ rhr_base + 5, or sleep < 6 h on 2 of the last 3
+-- nights. Judge them with the calves and his notes; one bad night is noise, a trend is a signal.
+select date, hrv, hrv_7d, hrv_base, hrv_base_sd, resting_hr, rhr_7d, rhr_base, sleep_h, sleep_score, vo2max, ctl, atl
+from wellness_trend where date >= current_date - 14 order by date;
 select date, type, description from flags where not resolved;
 -- season targets: last, this and next week (approved first, then any open proposal)
 select w.week_start, m.name block, m.focus, w.is_deload, w.run_km, w.long_run_km, w.runs, w.quality_sessions,

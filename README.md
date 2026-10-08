@@ -25,7 +25,7 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | RD | Run detail from the sync: km splits (pace, HR), HR drift (Friel's aerobic decoupling, runs ≥ 40′) and watch laps (intervals.icu intervals, best effort) in `activities.run_detail`; folded "Splits · laps · HR drift" under each run on the Week View; views `run_details`, `run_splits` for Cowork. 10 runs per sync, newest first (`src/lib/run-detail.ts`) | ✅ (verify on live after deploy) |
 | C2e | Week generator from season targets + free days (with D1) | ⏳ |
 | D0 | Coach inbox (`coach_proposals`): Cowork can propose any change (move / change / cancel a session, add / swap / change / remove a template exercise, new or archived templates), approved on the Week View, applied atomically by `apply_coach_proposal` | ✅ (restricted DB role for coaches: later) |
-| W | Garmin wellness sync (VO₂max, HRV, resting HR, sleep, CTL/ATL) → Stats › Fitness | ⏳ |
+| W | Garmin wellness sync (HRV, resting HR, sleep, VO₂max, CTL/ATL → `wellness`, last 14 days per sync, 120 on the first): Week View "Recovery" card (last night + 7-day vs your 28-day normal; warns on HRV 7d < base − 0.5 SD, resting HR +5 bpm, < 6 h sleep 2 of 3 nights, `src/lib/recovery.ts`), Stats charts (HRV, resting HR, sleep), view `wellness_trend` for Cowork | ✅ (verify on live after deploy) |
 | D1 | AI planner (Claude API): season, blocks and weekly plan with reasons; Regenerate with a reason | ⏳ |
 | D2 | Flexible week (sessions by priority, reshuffle when life happens) + weekly coach review with memory | ⏳ |
 | E | Automatic Sunday plan (Vercel Cron) | ⏳ |

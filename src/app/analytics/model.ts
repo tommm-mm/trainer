@@ -63,6 +63,8 @@ export type StatsInput = {
   hr: { restHr: number | null; maxHr: number | null };
   /** Logged workouts; unlinked ones are added to the load as gym sessions. */
   gym?: Omit<GymInput, "today" | "weeks">;
+  /** Garmin wellness (oldest first), for the recovery charts. */
+  wellness?: { date: string; hrv: number | null; resting_hr: number | null; sleep_s: number | null }[];
 };
 
 export type ChartSpec = {
@@ -406,6 +408,51 @@ export function buildStats(input: StatsInput): StatsModel {
         data: fats.map((b) => ({ label: formatShortDate(b.date), bf: b.body_fat_pct! / 100 })),
         lines: [{ key: "bf", name: "Body fat", color: COLORS.gym }],
         format: "pct",
+      },
+    });
+  }
+
+  // ---- Garmin wellness (only with data; signals live on the Week View's recovery card)
+  const well = (input.wellness ?? []).filter((d) => d.date >= weeks[0]);
+  const wellChart = (key: "hrv" | "resting_hr", name: string, color: string, format: "ms" | "bpm") => {
+    const rows = well.filter((d) => d[key] !== null);
+    const avg = rollingMean(rows.map((d) => d[key]), 7);
+    return {
+      data: rows.map((d, i) => ({ label: formatShortDate(d.date), v: d[key], avg: avg[i] === null ? null : round(avg[i]!, 1) })),
+      lines: [{ key: "v", name, color }],
+      trend: { key: "avg", name: "7-day average" },
+      format,
+    };
+  };
+  if (well.some((d) => d.hrv !== null)) {
+    blocks.push({
+      id: "hrv",
+      title: "HRV (overnight)",
+      verdict: null,
+      how: "Garmin's overnight heart-rate variability. Read the 7-day average against your own normal, never one night: a 7-day average below your 4-week normal (minus half its spread) means recovery is lagging (HRV-guided training, Plews 2012). Higher than usual is fine.",
+      chart: wellChart("hrv", "HRV", COLORS.cross, "ms"),
+    });
+  }
+  if (well.some((d) => d.resting_hr !== null)) {
+    blocks.push({
+      id: "resting-hr",
+      title: "Resting HR",
+      verdict: null,
+      how: "Garmin's daily resting heart rate. A 7-day average 5+ bpm above your 4-week normal often comes before illness or from accumulated fatigue; it also anchors your HR zones.",
+      chart: wellChart("resting_hr", "Resting HR", COLORS.run, "bpm"),
+    });
+  }
+  if (well.some((d) => d.sleep_s !== null)) {
+    blocks.push({
+      id: "sleep",
+      title: "Sleep",
+      verdict: null,
+      how: "Hours asleep per night from your watch. Under 6 h on 2 of 3 nights shows as a warning on the Week View; endurance athletes usually need 7–9 h.",
+      chart: {
+        data: well.filter((d) => d.sleep_s !== null).map((d) => ({ label: formatShortDate(d.date), h: round(d.sleep_s! / 3600, 1) })),
+        bars: [{ key: "h", name: "Sleep", color: COLORS.hiit }],
+        thresholds: [{ y: 6, status: "watch", label: "6 h" }],
+        format: "hours",
       },
     });
   }

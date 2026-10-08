@@ -39,6 +39,8 @@ import { FeedbackCard } from "./week/feedback-card";
 import { TodayCard } from "./week/today-card";
 import { QuickCheckin } from "./week/quick-checkin";
 import { RunDetailView } from "@/components/run-detail";
+import { RecoveryCard } from "@/components/recovery-card";
+import { BASELINE_DAYS, RECENT_DAYS, recoveryStatus } from "@/lib/recovery";
 
 export default async function WeekPage({ searchParams }: PageProps<"/">) {
   const { week } = await searchParams;
@@ -110,7 +112,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
 
   // This week's targets from the approved season (Season tab), load and time in zones,
   // and the plans of the 2 days either side (spacing checks across the week boundary).
-  const [seasonWeek, weekLoad, edgeRes, inbox] = await Promise.all([
+  const [seasonWeek, weekLoad, edgeRes, inbox, wellnessRes] = await Promise.all([
     goal ? loadSeasonWeek(supabase, goal.id, monday).catch(() => null) : null,
     loadAthlete(supabase, today)
       .then(async (athlete) => ({ athlete, ...(await loadWeeks(supabase, athlete, [monday], today)) }))
@@ -123,6 +125,12 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .or(`day.lt.${monday},day.gt.${sunday}`),
     // Coach proposals (plan + gym template changes) and the app's gym questions.
     loadInbox(supabase, today).catch(() => null),
+    // Garmin wellness for the recovery card: 7 days + the 28-day baseline.
+    supabase
+      .from("wellness")
+      .select("*")
+      .gte("date", addDays(today, -RECENT_DAYS - BASELINE_DAYS))
+      .lte("date", today),
   ]);
 
   const plans = plansRes.data ?? [];
@@ -165,6 +173,9 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
   // Gentle nudge when there's no check-in in the last 4 days (today included).
   const lastCheckin = lastCheckinRes.data?.date ?? null;
   const daysSinceCheckin = lastCheckin ? daysBetween(lastCheckin, today) : null;
+  const recovery = isCurrentWeek && !wellnessRes.error
+    ? recoveryStatus((wellnessRes.data ?? []).map((w) => ({ ...w, hrv: w.hrv === null ? null : Number(w.hrv), vo2max: w.vo2max === null ? null : Number(w.vo2max), ctl: w.ctl === null ? null : Number(w.ctl), atl: w.atl === null ? null : Number(w.atl) })), today)
+    : null;
   // The quick check-in shows on the current week until today has one.
   const showQuickCheckin = isCurrentWeek && !lastCheckinRes.error && daysSinceCheckin !== 0;
 
@@ -335,6 +346,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
         </section>
       )}
 
+      {recovery && <RecoveryCard status={recovery} today={today} />}
       {showQuickCheckin && <QuickCheckin lastDaysAgo={daysSinceCheckin} />}
 
       <section className="mb-4 grid grid-cols-3 gap-2">

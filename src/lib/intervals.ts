@@ -6,6 +6,7 @@ import type { TablesInsert } from "@/lib/database.types";
 import { paceFromRun } from "@/lib/format";
 import { histogramFromStream, type HrHistogram } from "@/lib/zones";
 import { decoupling, kmSplits, parseLaps, type RunDetail } from "@/lib/run-detail";
+import { parseWellness, type WellnessDay } from "@/lib/recovery";
 
 const BASE_URL = "https://intervals.icu/api/v1";
 // Not a secret (it's in the intervals.icu profile URL); env var overrides it.
@@ -146,6 +147,16 @@ export async function fetchRunDetail(activityId: string): Promise<RunDetail | nu
     console.error("[intervals] laps failed:", err instanceof Error ? err.message : err);
   }
   return { splits: kmSplits(time, dist, hrs), decoupling: decoupling(time, dist, hrs), laps };
+}
+
+/** Garmin wellness per day (HRV, resting HR, sleep, VO₂max, CTL/ATL). */
+export async function fetchWellness(oldest: string, newest: string): Promise<WellnessDay[]> {
+  const res = await fetch(`${athletePath()}/wellness?oldest=${oldest}&newest=${newest}`, {
+    headers: authHeaders(),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`intervals.icu wellness: ${res.status} ${(await res.text()).slice(0, 120)}`);
+  return parseWellness(await res.json());
 }
 
 type IntervalsAthlete = {
