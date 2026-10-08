@@ -145,7 +145,15 @@ select id, title, goal_type, target_date, params from goals where status = 'acti
 select date, type, sport_type, name, distance_km, duration_min, avg_pace, avg_hr, max_hr, rpe, feeling_score, feedback_notes
 from activities where date >= current_date - 7 order by date;
 -- check-ins and open flags
-select date, feeling_score, sleep_hours, soreness, stress, feeling_text, notes from checkins where date >= current_date - 14 order by date;
+-- calf_score: 0 nothing, 1 I feel them, 2 tight / sore, 3 it limits me; niggle = one body area.
+-- The Week View asks calves + niggle every day (10 s); calves ≥ 2 or a niggle opens a `niggle` flag.
+select date, calf_score, niggle, feeling_score, sleep_hours, soreness, stress, feeling_text, notes from checkins where date >= current_date - 14 order by date;
+-- Garmin recovery (synced daily): last night + the 7-day means vs the 28-day baseline before them.
+-- The app warns (Week View "Recovery" card) when hrv_7d < hrv_base − 0.5 × hrv_base_sd (HRV-guided
+-- training's smallest worthwhile change), rhr_7d ≥ rhr_base + 5, or sleep < 6 h on 2 of the last 3
+-- nights. Judge them with the calves and his notes; one bad night is noise, a trend is a signal.
+select date, hrv, hrv_7d, hrv_base, hrv_base_sd, resting_hr, rhr_7d, rhr_base, sleep_h, sleep_score, vo2max, ctl, atl
+from wellness_trend where date >= current_date - 14 order by date;
 select date, type, description from flags where not resolved;
 -- season targets: last, this and next week (approved first, then any open proposal)
 select w.week_start, m.name block, m.focus, w.is_deload, w.run_km, w.long_run_km, w.runs, w.quality_sessions,
@@ -183,6 +191,20 @@ order by l.week_start;
 select week_start, band_easy_min, band_moderate_min, band_hard_min, easy_share, missing,
        recovery_min, easy_min, marathon_min, threshold_min, vo2_min
 from weekly_zones where week_start >= date_trunc('week', current_date)::date - 21 order by week_start;
+-- hard sets per muscle per week (same rule as the app's meters: main-block working sets, RIR ≤ 4 or
+-- unrated; primary × 1, secondary × 0.5). Reference 10–20 per upper-body muscle in hypertrophy blocks.
+select week_start, muscle, hard_sets from weekly_muscle_sets
+where week_start >= date_trunc('week', current_date)::date - 21 order by week_start, muscle;
+-- aerobic trend on easy runs (RPE ≤ 4, or unrated with HRR ≤ 75%): Efficiency Factor (m/min ÷ bpm,
+-- higher = fitter) and pace at 65% HRR (s/km, lower = fitter). Read the trend over weeks, not one run.
+select week_start, count(*) runs, round(avg(ef), 3) ef, round(avg(pace_at_65_hrr_s_per_km)) pace_at_65_hrr
+from easy_runs where date >= current_date - 84 group by week_start order by week_start;
+-- per run: HR drift (Friel's aerobic decoupling, runs ≥ 40′: < 5% = the base held, ≥ 5% = HR drifted
+-- up at the same pace) and how many km splits / watch laps it has. Filled by the sync, newest first.
+select date, name, km, avg_hr, rpe, decoupling, splits, laps from run_details where date >= current_date - 28 order by date;
+-- the splits and laps of one run (the 8×1′ reps, the time trial): kind = 'split' (n = km mark) or 'lap'
+select kind, n, km, seconds, pace_s_per_km, hr, max_hr, label, work from run_splits
+where activity_id = '<activity id>' order by kind, n;
 -- gym suggestions he accepted this and last week (the app proposes sets × reps @ RIR + add/same/lower weight)
 select x.week_start, t.name template, e.name exercise, x.sets, x.rep_min, x.rep_max, x.target_rir, x.rationale
 from exercise_targets x join template_exercises te on te.id = x.template_exercise_id
@@ -191,6 +213,21 @@ where x.week_start >= date_trunc('week', current_date)::date - 7 order by x.week
 -- zone limits in bpm (anchors + threshold test) and the load calibration
 select rest_hr, max_hr, threshold_hr, threshold_date, easy_from, marathon_from, threshold_from, vo2_from from hr_zone_cuts;
 select load_calibration, updated_at from athlete_settings;
+```
+
+**Check a draft before you propose it** (nothing is written; same rules as the app, kept in sync by
+tests). Iterate until it's clean or every remaining warning is one you'd explain to him.
+
+```sql
+-- a season draft (the whole SeasonDraft JSON you'd pass to create_season_proposal):
+-- errors = it would be refused; warnings = ramp, ACWR (km and load), lighter weeks, long-run share,
+-- run-load ramp, your caps, race week. Seeded with his actual km and load of the 4 weeks before it.
+select check_season_draft((select id from goals where status = 'active'), '<SeasonDraft JSON>'::jsonb);
+-- a week's sessions as a draft: his saved sessions that aren't proposed + yours.
+-- red = safety (gym + hard run same day, hard runs back to back, leg-heaviest gym the day before a
+-- hard run); amber = rest and totals vs the season week. Without the list: checks what's saved.
+select check_week('<Monday>', '[{"day":"<YYYY-MM-DD>","session_type":"tempo","target_distance_km":10},
+                                {"day":"<YYYY-MM-DD>","session_type":"gym_full","template_id":"<id>"}]'::jsonb);
 ```
 
 **Write next week's sessions** (one row per session; gym rows carry the template id from

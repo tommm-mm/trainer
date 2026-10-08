@@ -33,6 +33,7 @@ export type Database = {
           max_hr: number | null
           name: string | null
           rpe: number | null
+          run_detail: Json | null
           source: string
           sport_type: string | null
           type: string
@@ -56,6 +57,7 @@ export type Database = {
           max_hr?: number | null
           name?: string | null
           rpe?: number | null
+          run_detail?: Json | null
           source: string
           sport_type?: string | null
           type: string
@@ -144,11 +146,13 @@ export type Database = {
       }
       checkins: {
         Row: {
+          calf_score: number | null
           created_at: string
           date: string
           feeling_score: number | null
           feeling_text: string | null
           id: string
+          niggle: string | null
           notes: string | null
           sleep_hours: number | null
           soreness: number | null
@@ -156,11 +160,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          calf_score?: number | null
           created_at?: string
           date: string
           feeling_score?: number | null
           feeling_text?: string | null
           id?: string
+          niggle?: string | null
           notes?: string | null
           sleep_hours?: number | null
           soreness?: number | null
@@ -632,6 +638,38 @@ export type Database = {
           week_start: string
         }
         Update: Partial<Database["public"]["Tables"]["gym_week_rules"]["Insert"]>
+        Relationships: []
+      }
+      wellness: {
+        Row: {
+          atl: number | null
+          ctl: number | null
+          date: string
+          hrv: number | null
+          readiness: number | null
+          resting_hr: number | null
+          sleep_s: number | null
+          sleep_score: number | null
+          steps: number | null
+          updated_at: string
+          user_id: string
+          vo2max: number | null
+        }
+        Insert: {
+          atl?: number | null
+          ctl?: number | null
+          date: string
+          hrv?: number | null
+          readiness?: number | null
+          resting_hr?: number | null
+          sleep_s?: number | null
+          sleep_score?: number | null
+          steps?: number | null
+          updated_at?: string
+          user_id?: string
+          vo2max?: number | null
+        }
+        Update: Partial<Database["public"]["Tables"]["wellness"]["Insert"]>
         Relationships: []
       }
       workout_templates: {

@@ -4,9 +4,9 @@
 // The SQL views Cowork reads use the same row, so both see the same numbers.
 
 import type { DB } from "@/lib/queries";
-import type { Tables } from "@/lib/database.types";
+import type { Json, Tables } from "@/lib/database.types";
 import { addDays, mondayOf } from "@/lib/dates";
-import { fetchHrHistogram, fetchHrSettings } from "@/lib/intervals";
+import { fetchHrHistogram, fetchHrSettings, fetchRunDetail, fetchWellness } from "@/lib/intervals";
 import {
   resolveHrAnchors,
   sessionLoads,
@@ -164,6 +164,66 @@ export async function fillHrHistograms(supabase: DB, limit = HR_STREAMS_PER_SYNC
     );
   }
   return filled;
+}
+
+/** Run details (splits, drift, laps) fetched per sync: newest first, history backfills. */
+export const RUN_DETAILS_PER_SYNC = 10;
+
+/**
+ * Splits, HR drift and laps for Garmin runs that don't have them yet. A run
+ * without streams is stored as `{}` so it isn't fetched again; a failed
+ * request is retried on the next sync.
+ */
+export async function fillRunDetails(supabase: DB, limit = RUN_DETAILS_PER_SYNC): Promise<number> {
+  const { data, error } = await supabase
+    .from("activities")
+    .select("id, external_id")
+    .eq("source", "garmin")
+    .eq("type", "run")
+    .not("external_id", "is", null)
+    .is("run_detail", null)
+    .order("date", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  let filled = 0;
+  const todo = data ?? [];
+  for (let i = 0; i < todo.length; i += STREAM_CONCURRENCY) {
+    await Promise.all(
+      todo.slice(i, i + STREAM_CONCURRENCY).map(async (a) => {
+        try {
+          const d = await fetchRunDetail(a.external_id!);
+          const { error: upErr } = await supabase
+            .from("activities")
+            .update({ run_detail: (d ?? {}) as Json })
+            .eq("id", a.id);
+          if (upErr) throw upErr;
+          filled++;
+        } catch (err) {
+          console.error("[sync] run detail failed:", err instanceof Error ? err.message : err);
+        }
+      }),
+    );
+  }
+  return filled;
+}
+
+/** Wellness days re-read each sync (late Garmin uploads), and on the first run. */
+export const WELLNESS_DAYS = 14;
+export const WELLNESS_FIRST_DAYS = 120;
+
+/** Upserts Garmin wellness (HRV, resting HR, sleep…) for the recent days; returns the days stored. */
+export async function syncWellness(supabase: DB, userId: string, today: string): Promise<number> {
+  const { count, error } = await supabase.from("wellness").select("date", { count: "exact", head: true });
+  if (error) throw error;
+  const days = await fetchWellness(addDays(today, -(count ? WELLNESS_DAYS : WELLNESS_FIRST_DAYS)), today);
+  if (days.length === 0) return 0;
+  const { error: upErr } = await supabase
+    .from("wellness")
+    .upsert(days.map((d) => ({ ...d, user_id: userId, updated_at: new Date().toISOString() })), {
+      onConflict: "user_id,date",
+    });
+  if (upErr) throw upErr;
+  return days.length;
 }
 
 /** Days of history behind the median RPE of unrated sessions (as on the Stats page). */
