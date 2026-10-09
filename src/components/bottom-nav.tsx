@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LiveRefresh } from "./live-refresh";
+import { ServiceWorkerRegister } from "./sw-register";
 
 // Tabs for the v1 screens. Disabled tabs are rendered greyed out until
 // their phase ships.
@@ -54,6 +55,7 @@ export function PageShell({
       </main>
       <BottomNav active={active} />
       <LiveRefresh />
+      <ServiceWorkerRegister />
     </>
   );
 }

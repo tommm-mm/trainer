@@ -29,7 +29,7 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | D1 | AI planner (Claude API): season, blocks and weekly plan with reasons; Regenerate with a reason | ⏳ |
 | D2 | Flexible week (sessions by priority, reshuffle when life happens) + weekly coach review with memory | ⏳ |
 | E | Automatic Sunday plan (Vercel Cron) | ⏳ |
-| F | PWA install + offline shell + "your week is ready" notification | ⏳ |
+| F | Installable app (manifest, icons, `public/sw.js`: pages network-first with the last copy kept offline, `/_next/static` cached) + push notifications (Settings page: turn on per phone, test button, what to notify, reminder time / timezone). Proposals: triggers queue events in `push_outbox`, one summary after 2 quiet minutes; check-in reminder once a day at your time if today has none. pg_cron (every 5′) → `push_tick()` → `GET /api/push/tick` (secret) → `push_due()` → web-push → `push_report()`. Secrets: Vault (`push_secret`, `push_app_url`) + Vercel env (`PUSH_SECRET`, VAPID keys) | ✅ |
 | U | UX/UI review: missing tools and features, cleaner and more intuitive screens (after the coach works end to end) | ⏳ |
 | Later | "Ask coach" chat in the app; next season after Padova | ⏳ |
 
@@ -198,6 +198,8 @@ npm run dev
 | `INTERVALS_ICU_API_KEY` | Vercel, server only | A |
 | `INTERVALS_ICU_ATHLETE_ID` | optional, defaults to `i726906` | A |
 | `ANTHROPIC_API_KEY` | Vercel, server only | D |
+| `VAPID_PRIVATE_KEY` | Vercel, server only (the public key is in `src/lib/push/keys.ts`) | F |
+| `PUSH_SECRET` | Vercel, server only; same value in Supabase Vault `push_secret` (+ `push_app_url`) | F |
 
 ## Account (single user)
 

@@ -60,6 +60,7 @@ describe("parseLaps", () => {
         { type: "WORK", moving_time: 60, distance: 280, average_heartrate: 171.4, max_heartrate: 178, label: "Rep 1" },
         { type: "RECOVERY", elapsed_time: 90, distance: 190, average_heartrate: 150 },
         { type: "WORK", moving_time: 0 },
+        { type: "RECOVERY", moving_time: 1, distance: 0 },
         "junk",
       ],
     });

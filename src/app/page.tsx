@@ -225,11 +225,16 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
           </h1>
           <p className="text-sm text-neutral-400">{formatWeekRange(monday)}</p>
         </div>
-        <form action={signOut}>
-          <button className="text-xs text-neutral-500 hover:text-neutral-300">
-            Sign out
-          </button>
-        </form>
+        <div className="flex items-center gap-3">
+          <Link href="/settings" className="text-xs text-neutral-400 hover:text-neutral-200">
+            Settings
+          </Link>
+          <form action={signOut}>
+            <button className="text-xs text-neutral-500 hover:text-neutral-300">
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
 
       <div className="mb-3">

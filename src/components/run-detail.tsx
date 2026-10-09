@@ -37,7 +37,7 @@ export function RunDetailView({ detail }: { detail: unknown }) {
           <tbody>
             {laps.map((l) => (
               <tr key={l.n} className={l.work === false ? "text-neutral-500" : ""}>
-                <td>{l.label ?? (l.work === true ? `Rep ${l.n}` : l.work === false ? "rest" : l.n)}</td>
+                <td>{l.label ?? (l.work === false ? `${l.n} · rest` : l.n)}</td>
                 <td className="text-right">{l.km != null ? `${l.km} km` : "–"}</td>
                 <td className="text-right">{formatDuration(l.s)}</td>
                 <td className="text-right">{pace(paceOf(l))}</td>

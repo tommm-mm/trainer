@@ -640,6 +640,52 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["gym_week_rules"]["Insert"]>
         Relationships: []
       }
+      notification_settings: {
+        Row: {
+          checkin: boolean
+          checkin_time: string
+          last_checkin_reminder: string | null
+          proposals: boolean
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checkin?: boolean
+          checkin_time?: string
+          last_checkin_reminder?: string | null
+          proposals?: boolean
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["notification_settings"]["Insert"]>
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_ok_at: string | null
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_ok_at?: string | null
+          p256dh: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Update: Partial<Database["public"]["Tables"]["push_subscriptions"]["Insert"]>
+        Relationships: []
+      }
       wellness: {
         Row: {
           atl: number | null
@@ -834,6 +880,8 @@ export type Database = {
     }
     Functions: {
       apply_coach_proposal: { Args: { p_id: string }; Returns: undefined }
+      push_due: { Args: { p_secret: string }; Returns: Json }
+      push_report: { Args: { p_secret: string; p_gone: string[]; p_ok: string[] }; Returns: undefined }
       approve_season: { Args: { p_season_id: string }; Returns: undefined }
       create_season_proposal: { Args: { p_goal_id: string; p_draft: Json }; Returns: string }
       is_muscle_list: { Args: { m: string[] }; Returns: boolean }
