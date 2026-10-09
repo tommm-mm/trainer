@@ -2,7 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
-const PUBLIC_PATHS = ["/login"];
+// Public: the login page, the installable-app files (the browser fetches them
+// without a session) and the push tick (pg_cron, authenticated by its secret).
+const PUBLIC_PATHS = ["/login", "/sw.js", "/manifest.webmanifest", "/icons/", "/api/push/tick"];
 
 // Refreshes the Supabase session cookie on every request and sends
 // unauthenticated visitors to /login.

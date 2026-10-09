@@ -21,6 +21,7 @@ const MIN_SPEED = 1;
 export const DECOUPLING_MIN_S = 40 * 60;
 export const DECOUPLING_GOOD = 5;
 const PARTIAL_KM_MIN_M = 200;
+const MIN_LAP_S = 5;
 
 type Num = number | null | undefined;
 const ok = (v: Num): v is number => v != null && Number.isFinite(v);
@@ -99,7 +100,8 @@ export function parseLaps(raw: unknown): Lap[] | null {
     .filter((x) => x && typeof x === "object")
     .map((x, i): Lap | null => {
       const s = num(x.moving_time) ?? num(x.elapsed_time);
-      if (!s || s <= 0) return null;
+      // A lap of a few seconds is a double press of the lap button.
+      if (!s || s < MIN_LAP_S) return null;
       const m = num(x.distance);
       const hr = num(x.average_heartrate);
       const max = num(x.max_heartrate);
