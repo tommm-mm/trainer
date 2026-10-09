@@ -198,7 +198,7 @@ npm run dev
 | `INTERVALS_ICU_API_KEY` | Vercel, server only | A |
 | `INTERVALS_ICU_ATHLETE_ID` | optional, defaults to `i726906` | A |
 | `ANTHROPIC_API_KEY` | Vercel, server only | D |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Vercel (private: server only) | F |
+| `VAPID_PRIVATE_KEY` | Vercel, server only (the public key is in `src/lib/push/keys.ts`) | F |
 | `PUSH_SECRET` | Vercel, server only; same value in Supabase Vault `push_secret` (+ `push_app_url`) | F |
 
 ## Account (single user)

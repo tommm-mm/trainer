@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import type { PushMessage } from "./messages";
+import { VAPID_PUBLIC_KEY } from "./keys";
 
 // Sends with the VAPID keys (Vercel env). Never throws per subscription: it
 // reports which endpoints worked and which are gone (404 / 410 = the phone
@@ -10,10 +11,9 @@ export type Sub = { endpoint: string; p256dh: string; auth: string };
 let configured = false;
 function configure() {
   if (configured) return;
-  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
-  if (!pub || !priv) throw new Error("VAPID keys are not set.");
-  webpush.setVapidDetails("mailto:mocenigotommaso@gmail.com", pub, priv);
+  if (!priv) throw new Error("VAPID_PRIVATE_KEY is not set.");
+  webpush.setVapidDetails("mailto:mocenigotommaso@gmail.com", VAPID_PUBLIC_KEY, priv);
   configured = true;
 }
 

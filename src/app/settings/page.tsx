@@ -4,6 +4,7 @@ import { cardCls } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { PushManager } from "./push-manager";
 import { PrefsForm } from "./prefs-form";
+import { VAPID_PUBLIC_KEY } from "@/lib/push/keys";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -22,7 +23,7 @@ export default async function SettingsPage() {
 
       <section className={`${cardCls} mb-4`}>
         <h2 className="mb-2 text-sm font-semibold">App &amp; notifications</h2>
-        <PushManager vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
+        <PushManager vapidKey={VAPID_PUBLIC_KEY} />
         <p className="mt-2 text-[11px] text-neutral-500">
           {subsRes.count ?? 0} device{subsRes.count === 1 ? "" : "s"} with notifications on.
         </p>
