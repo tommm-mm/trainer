@@ -173,6 +173,6 @@ begin
     headers := jsonb_build_object('Authorization', 'Bearer ' || v_secret),
     timeout_milliseconds := 20000);
 end $$;
-revoke all on function public.push_tick() from public;
+revoke all on function public.push_tick() from public, anon, authenticated;
 
 select cron.schedule('push-tick', '*/5 * * * *', 'select public.push_tick()');
