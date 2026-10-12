@@ -4,7 +4,7 @@
 // The SQL views Cowork reads use the same row, so both see the same numbers.
 
 import type { DB } from "@/lib/queries";
-import type { Json, Tables } from "@/lib/database.types";
+import type { Json, Tables, TablesInsert } from "@/lib/database.types";
 import { addDays, mondayOf } from "@/lib/dates";
 import { fetchHrHistogram, fetchHrSettings, fetchRunDetail, fetchWellness } from "@/lib/intervals";
 import {
@@ -121,6 +121,18 @@ export async function refreshAthleteSettings(supabase: DB, userId: string, today
     { onConflict: "user_id" },
   );
   if (error) throw error;
+}
+
+/**
+ * Stamps the sync for the health line: success → last_sync_at (error cleared),
+ * failure → last_sync_error only. Best effort: never fails or hides the sync's own result.
+ */
+export async function recordSync(supabase: DB, userId: string, error: string | null): Promise<void> {
+  const row: TablesInsert<"athlete_settings"> = error === null
+    ? { user_id: userId, last_sync_at: new Date().toISOString(), last_sync_error: null }
+    : { user_id: userId, last_sync_error: error.slice(0, 500) };
+  const { error: dbErr } = await supabase.from("athlete_settings").upsert(row, { onConflict: "user_id" });
+  if (dbErr) console.error("[sync] health stamp skipped:", dbErr.message);
 }
 
 /** Histograms fetched per sync: new activities first, older ones backfill over a few syncs. */

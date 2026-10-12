@@ -12,7 +12,7 @@ import { addDays, todayISO } from "@/lib/dates";
 import { sessionKind } from "@/lib/sessions";
 import { fetchActivities, mapActivity } from "@/lib/intervals";
 import { linkWorkouts } from "@/lib/gym/link";
-import { fillHrHistograms, fillRunDetails, refreshAthleteSettings, syncWellness } from "@/lib/athlete";
+import { fillHrHistograms, fillRunDetails, recordSync, refreshAthleteSettings, syncWellness } from "@/lib/athlete";
 
 const FIRST_SYNC_DAYS = 30;
 const OVERLAP_DAYS = 3;
@@ -39,12 +39,24 @@ export const BACKFILL_DAYS = 120;
 /**
  * `backfillDays` re-reads a longer window (one-time history import); the
  * upsert keeps it idempotent, so re-running it only refreshes rows.
+ * Every run is stamped on athlete_settings (Settings → Health).
  */
 export async function syncGarmin(
   supabase: DB,
   userId: string,
   opts: { backfillDays?: number } = {},
 ): Promise<SyncResult> {
+  try {
+    const result = await runSync(supabase, userId, opts);
+    await recordSync(supabase, userId, null);
+    return result;
+  } catch (err) {
+    await recordSync(supabase, userId, err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+}
+
+async function runSync(supabase: DB, userId: string, opts: { backfillDays?: number }): Promise<SyncResult> {
   const to = todayISO();
 
   const { data: last, error: lastErr } = await supabase

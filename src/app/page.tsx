@@ -35,6 +35,7 @@ import { approveWeek, resolveFlag } from "./week/actions";
 import { PlanRow, type PlanTemplate } from "./week/plan-row";
 import { AddSession } from "./week/add-session";
 import { SyncButton } from "./week/sync-button";
+import { syncRow } from "@/lib/health";
 import { FeedbackCard } from "./week/feedback-card";
 import { TodayCard } from "./week/today-card";
 import { QuickCheckin } from "./week/quick-checkin";
@@ -112,7 +113,7 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
 
   // This week's targets from the approved season (Season tab), load and time in zones,
   // and the plans of the 2 days either side (spacing checks across the week boundary).
-  const [seasonWeek, weekLoad, edgeRes, inbox, wellnessRes] = await Promise.all([
+  const [seasonWeek, weekLoad, edgeRes, inbox, wellnessRes, syncRes] = await Promise.all([
     goal ? loadSeasonWeek(supabase, goal.id, monday).catch(() => null) : null,
     loadAthlete(supabase, today)
       .then(async (athlete) => ({ athlete, ...(await loadWeeks(supabase, athlete, [monday], today)) }))
@@ -131,7 +132,14 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       .select("*")
       .gte("date", addDays(today, -RECENT_DAYS - BASELINE_DAYS))
       .lte("date", today),
+    // Health line: warn here when Garmin hasn't synced for a day (details in Settings).
+    supabase.from("athlete_settings").select("last_sync_at, last_sync_error").maybeSingle(),
   ]);
+  const syncHealth = syncRes.data
+    ? syncRow({ lastSyncAt: syncRes.data.last_sync_at, lastSyncError: syncRes.data.last_sync_error }, new Date())
+    : null;
+  // Before the first stamped sync (no row / no stamp yet) there's nothing to warn about.
+  const syncWarning = syncHealth && syncRes.data?.last_sync_at && syncHealth.level !== "ok" ? syncHealth : null;
 
   const plans = plansRes.data ?? [];
   const activities = activitiesRes.data ?? [];
@@ -238,8 +246,22 @@ export default async function WeekPage({ searchParams }: PageProps<"/">) {
       </header>
 
       <div className="mb-3">
-        <SyncButton />
+        <SyncButton stale={syncWarning !== null} />
       </div>
+
+      {syncWarning && (
+        <Link
+          href="/settings"
+          className={`mb-4 block rounded-xl border px-4 py-3 text-sm ${
+            syncWarning.level === "red"
+              ? "border-red-500/40 bg-red-500/10 text-red-200"
+              : "border-amber-500/40 bg-amber-500/10 text-amber-200"
+          }`}
+        >
+          Garmin last synced {syncWarning.value}.{syncRes.data?.last_sync_error ? ` Last attempt failed: ${syncRes.data.last_sync_error}` : ""}{" "}
+          <span className="text-neutral-400">Settings →</span>
+        </Link>
+      )}
 
       {action && <TodayCard action={action} templateName={templateName} />}
 
