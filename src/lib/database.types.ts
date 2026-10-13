@@ -77,6 +77,8 @@ export type Database = {
           threshold_hr: number | null
           updated_at: string
           user_id: string
+          last_sync_at: string | null
+          last_sync_error: string | null
         }
         Insert: {
           load_calibration?: Json
@@ -88,6 +90,8 @@ export type Database = {
           threshold_hr?: number | null
           updated_at?: string
           user_id?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
         }
         Update: Partial<Database["public"]["Tables"]["athlete_settings"]["Insert"]>
         Relationships: []
@@ -645,6 +649,7 @@ export type Database = {
           checkin: boolean
           checkin_time: string
           last_checkin_reminder: string | null
+          last_push_at: string | null
           proposals: boolean
           timezone: string
           updated_at: string
@@ -654,6 +659,7 @@ export type Database = {
           checkin?: boolean
           checkin_time?: string
           last_checkin_reminder?: string | null
+          last_push_at?: string | null
           proposals?: boolean
           timezone?: string
           updated_at?: string
@@ -881,6 +887,7 @@ export type Database = {
     Functions: {
       apply_coach_proposal: { Args: { p_id: string }; Returns: undefined }
       push_due: { Args: { p_secret: string }; Returns: Json }
+      push_health: { Args: Record<string, never>; Returns: Json }
       push_report: { Args: { p_secret: string; p_gone: string[]; p_ok: string[] }; Returns: undefined }
       approve_season: { Args: { p_season_id: string }; Returns: undefined }
       create_season_proposal: { Args: { p_goal_id: string; p_draft: Json }; Returns: string }

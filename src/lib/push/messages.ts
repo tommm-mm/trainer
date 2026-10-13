@@ -1,7 +1,15 @@
 // Push notification texts. Pure: the tick route gets the facts from
 // push_due() (SQL) and turns them into what the phone shows.
 
-export type ProposalFacts = { plans: number; changes: number; seasons: number; first_week: string | null };
+export type ProposalFacts = {
+  plans: number;
+  changes: number;
+  seasons: number;
+  first_week: string | null;
+  /** Planned km of the first proposed week and the season's key session for it (when known). */
+  week_km?: number | null;
+  key_session?: string | null;
+};
 export type DueFacts = { proposals: ProposalFacts | null; checkin: boolean };
 
 export type PushMessage = {
@@ -24,9 +32,13 @@ export function proposalMessage(p: ProposalFacts): PushMessage | null {
   if (parts.length === 0) return null;
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0];
   const onlySeason = p.plans === 0 && p.changes === 0;
+  const week = p.plans > 0
+    ? [p.week_km ? `${Math.round(p.week_km)} km` : null, p.key_session ? `key: ${p.key_session}` : null]
+        .filter((x): x is string => x !== null)
+    : [];
   return {
     title: "Cowork has a proposal",
-    body: `${list[0].toUpperCase()}${list.slice(1)} to approve. Tap to review.`,
+    body: `${list[0].toUpperCase()}${list.slice(1)} to approve${week.length ? ` · ${week.join(" · ")}` : ""}. Tap to review.`,
     url: onlySeason ? "/season?view=proposed" : p.first_week && p.changes === 0 ? `/?week=${p.first_week}` : "/",
     tag: "proposals",
   };

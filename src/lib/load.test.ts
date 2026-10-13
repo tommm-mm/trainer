@@ -132,6 +132,8 @@ describe("athleteFromRow", () => {
       threshold_date: "2026-11-14",
       load_calibration: { easy_rpe: 3.5, gym_min: "x", hiit_week: 48 },
       updated_at: "2026-10-05T00:00:00Z",
+      last_sync_at: null,
+      last_sync_error: null,
     });
     expect(a.anchors).toEqual({ rest: 48, max: 196, restSource: "garmin", maxSource: "default", threshold: 174 });
     expect(a.calibration).toEqual({ ...DEFAULT_CALIBRATION, easy_rpe: 3.5, hiit_week: 48 });

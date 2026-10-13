@@ -36,8 +36,11 @@ function ago(ms: number) {
   return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
 }
 
-/** Syncs Garmin (via intervals.icu) when the app opens, and on tap. */
-export function SyncButton() {
+/**
+ * Syncs Garmin (via intervals.icu) when the app opens, and on tap.
+ * `stale`: the page shows a sync warning, so refresh after any successful sync to clear it.
+ */
+export function SyncButton({ stale = false }: { stale?: boolean }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>({ state: "idle", text: "" });
 
@@ -57,14 +60,14 @@ export function SyncButton() {
         state: "idle",
         text: `Synced ${ago(now)}${bits.length ? ` · ${bits.join(", ")}` : ""}`,
       });
-      if (body.imported || body.updated || body.completedPlans) router.refresh();
+      if (stale || body.imported || body.updated || body.completedPlans) router.refresh();
     } catch (err) {
       setStatus({
         state: "error",
         text: err instanceof Error ? err.message : "Sync failed",
       });
     }
-  }, [router]);
+  }, [router, stale]);
 
   useEffect(() => {
     // localStorage only exists in the browser, so this runs after mount.
