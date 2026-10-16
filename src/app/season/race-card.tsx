@@ -62,7 +62,8 @@ export function RaceCard({ f, race, today }: { f: RaceForecast; race: string; to
         </>
       ) : (
         <p className="text-sm text-neutral-300">
-          No prediction yet: it needs a race or time trial (≥ 5 km, last 12 months) to calibrate your heart-rate data.
+          No prediction yet: it needs a race or time trial (≥ 5 km, last 12 months; planned ones in the plan count) to
+          calibrate your heart-rate data.
         </p>
       )}
 
@@ -76,16 +77,24 @@ export function RaceCard({ f, race, today }: { f: RaceForecast; race: string; to
       <details className="text-sm">
         <summary className="cursor-pointer text-xs text-neutral-400">How it&apos;s built</summary>
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
-          <dt className="text-neutral-500">Race anchor</dt>
+          <dt className="text-neutral-500">Latest race / test</dt>
           <dd>
             {p.anchor
               ? `${p.anchor.name ?? "Race"} · ${formatShortDate(p.anchor.date)} · ${p.anchor.km.toFixed(1)} km in ${formatDuration(p.anchor.seconds)} → VDOT ${p.anchor.vdot.toFixed(1)} ≈ ${hm(p.anchor.marathon)} marathon`
               : "none found in the last 12 months"}
           </dd>
+          {p.best && (
+            <>
+              <dt className="text-neutral-500">Best in 12 months</dt>
+              <dd className="text-neutral-400">
+                {`${p.best.name ?? "Race"} · ${formatShortDate(p.best.date)} · VDOT ${p.best.vdot.toFixed(1)} ≈ ${hm(p.best.marathon)} (older: context, not the prediction)`}
+              </dd>
+            </>
+          )}
           <dt className="text-neutral-500">Fitness now</dt>
           <dd>
             {p.fitness
-              ? `VDOT ${p.fitness.vdot.toFixed(1)} from your last 6 weeks (${p.fitness.runs} runs, pace vs heart rate, best third; ×${p.fitness.factor.toFixed(2)} calibrated on the race)`
+              ? `VDOT ${p.fitness.vdot.toFixed(1)} from your last 6 weeks (median of ${p.fitness.runs} easy runs, pace vs heart rate; ×${p.fitness.factor.toFixed(2)} calibrated on the latest race / test)`
               : p.anchor
                 ? "not enough runs with heart rate around the race or now (≥ 3 each): using the race alone"
                 : "needs a race to calibrate"}
@@ -103,8 +112,8 @@ export function RaceCard({ f, race, today }: { f: RaceForecast; race: string; to
           )}
         </dl>
         <p className="mt-2 text-[11px] text-neutral-500">
-          Daniels&apos; VDOT formulas. Fitness = pace vs heart rate on every run (Runalyze&apos;s method), calibrated on
-          your race. Shape &lt; 100% slows the prediction (up to ~10% of VDOT). Range = spread of your best runs.
+          Daniels&apos; VDOT formulas. Fitness = pace vs heart rate on your easy runs (Runalyze&apos;s method), calibrated
+          on your latest race or test. Shape &lt; 100% slows the prediction (up to ~10% of VDOT). Range = spread of your best runs.
         </p>
       </details>
 

@@ -58,7 +58,12 @@ for the tick calls; first real proposal summary; 16:00 reminder on a day without
 
 ## Next (roadmap, re-prioritised 16 Oct)
 
-1. **Marathon prediction + race pace (RP)**: built 16 Oct (PR from `claude/optimistic-archimedes-1obdf7`).
+1. **Marathon prediction + race pace (RP)**: merged 16 Oct (tommm-mm/trainer#22) + follow-up (anchor = most recent
+   race, planned tests from the plan, max HR 192). Live on 16 Oct after his 5 km TT (23:39, all out, positive
+   split 4:31 → 4:47): anchor VDOT 41.0 → 3:45 with full shape, **3:55 (3:48–4:03) today** at 45 % shape,
+   calibration ×1.158 on 16 easy runs, trend +7′ vs 4 weeks ago (easy-run efficiency still sliding).
+   3:30 needs VDOT ≈ 45 (his March level) + full shape.
+   Earlier plan for this step (kept for the record):
    After merge: apply `20261016090000_race_prediction.sql` (a view, no `delete`: the connector works),
    Tommaso taps **Import 12 months** on the Season card → verify on live that the anchor = his March
    half (≈ 1:39) and that the calibration factor is sane (expected ≈ 1.15–1.25).

@@ -97,7 +97,7 @@ running base was < 20 km/week in August 2026. Shoes: Brooks (easy days), Puma De
 
 ## Efforts (heart rate reserve, Karvonen)
 
-Anchors today: rest 46, max 195 (app default; highest seen 182 → update after a max effort).
+Anchors: rest from Garmin (48 on 16 Oct), max 192 (highest seen, 19 Jun; confirmed by Tommaso 16 Oct after an all-out 5 km TT peaked at 187).
 
 | Effort | % HRR | HR now | Use |
 |---|---|---|---|
@@ -207,8 +207,11 @@ select kind, n, km, seconds, pace_s_per_km, hr, max_hr, label, work from run_spl
 where activity_id = '<activity id>' order by kind, n;
 -- marathon prediction inputs (the app's Season card shows the prediction: race anchor → Daniels VDOT, fitness =
 -- median HR-based VDOT of EASY runs (60–72% HRR) over 6 weeks × calibration on the race, marathon shape).
--- Read run_vdot on easy runs as a trend (same HR, faster = up); race_like rows are candidate anchors.
-select date, name, km, pace_s_km, avg_hr, hrr, run_vdot, easy, race_like, race_vdot
+-- Read run_vdot on easy runs as a trend (same HR, faster = up); race_like rows are candidate anchors and the
+-- most recent one anchors the prediction. Time trials / races / tests YOU schedule are read from the plan
+-- (session type or notes: "time trial", "race", "gara", "test"; not threshold tests): planned_test.
+-- 16 Oct 2026 5 km TT: 23:39 → VDOT 41.0 ≈ 3:45 marathon equivalent (March half 1:39 ≈ 45.7).
+select date, name, km, pace_s_km, avg_hr, hrr, run_vdot, easy, race_like, planned_test, race_vdot
 from race_prediction_inputs where date >= current_date - 84 order by date;
 -- gym suggestions he accepted this and last week (the app proposes sets × reps @ RIR + add/same/lower weight)
 select x.week_start, t.name template, e.name exercise, x.sets, x.rep_min, x.rep_max, x.target_rir, x.rationale
