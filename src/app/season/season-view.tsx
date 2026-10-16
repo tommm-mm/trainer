@@ -33,6 +33,7 @@ import { approveSeason, proposeStarterSeason, rejectSeason, removeRace } from ".
 import { SeasonChart } from "./season-chart";
 import { LoadChart } from "./load-chart";
 import { AddRaceForm, ThresholdForm, WeekEditForm } from "./forms";
+import { RaceCard, type RaceForecast } from "./race-card";
 
 export function SeasonView({
   today,
@@ -48,6 +49,7 @@ export function SeasonView({
   loads = new Map(),
   zones = new Map(),
   loadHistory = [],
+  forecast = null,
 }: {
   today: string;
   goal: Tables<"goals"> | null;
@@ -62,6 +64,7 @@ export function SeasonView({
   loads?: Map<string, WeekLoad>;
   zones?: Map<string, ZoneWeek>;
   loadHistory?: { week_start: string; total: number; run: number }[];
+  forecast?: RaceForecast | null;
 }) {
   const thisMonday = mondayOf(today);
 
@@ -139,6 +142,10 @@ export function SeasonView({
           planned={planned.get(thisMonday) ?? null}
           zones={zones.get(thisMonday)}
         />
+      )}
+
+      {forecast && (
+        <RaceCard f={forecast} race={(goal.params as RaceParams).race_name ?? goal.title} today={today} />
       )}
 
       <section className={cardCls}>

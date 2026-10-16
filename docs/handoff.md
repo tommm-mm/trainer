@@ -1,4 +1,4 @@
-# Handoff: where the build stands (12 Oct 2026)
+# Handoff: where the build stands (16 Oct 2026)
 
 For a new Claude Code session. Read `README.md` (build status + formulas) and
 `docs/coach/cowork-instructions.md` (the PT's rules) first.
@@ -56,22 +56,26 @@ Vercel env set: `VAPID_PRIVATE_KEY`, `PUSH_SECRET`. Vault: `push_secret`, `push_
 To verify: `push_subscriptions` row after he turns notifications on; `net._http_response` status 200
 for the tick calls; first real proposal summary; 16:00 reminder on a day without check-in.
 
-## Next (roadmap, agreed 13 Oct: value features first, then UX)
+## Next (roadmap, re-prioritised 16 Oct)
 
-1. **Build templates** (before 30 Nov): Cowork designs and proposes them.
-2. ~~Health line~~ (H, tommm-mm/trainer#21). Live except `push_report` (paste, see F state).
-3. **Readiness → today's call**: go / easier / rest each morning from HRV, resting HR, sleep,
-   calves/niggle and load (ACWR); when not "go", a swap proposal he approves.
-4. **Marathon prediction + race pace** toward Padova (18 Apr 2027, 3:30 = 4:59 /km): predicted time
-   from recent runs / laps / EF trend; HR at MP week by week; view for Cowork.
-5. **Weekly report card**: planned vs done (km, sessions, load, key session hit), misses; feeds
-   Cowork's Sunday review.
-6. **Travel / Erasmus mode** (before December, 28 Dec travel week): ranges in Settings + per-day
-   toggle on the Week View (`no_gym` / `transit` / `limited`), view for Cowork, week checks in TS
-   **and** `check_week`.
-7. **U** UX & UI pass, built around the today card; ask Tommaso for his notes first.
-8. Parked: calf / niggle management rules, Monday push (dropped), D1 AI planner, E server Sunday plan.
-9. Measure use after 2–3 weeks: check-ins per week, proposals approved vs edited.
+1. **Marathon prediction + race pace (RP)**: built 16 Oct (PR from `claude/optimistic-archimedes-1obdf7`).
+   After merge: apply `20261016090000_race_prediction.sql` (a view, no `delete`: the connector works),
+   Tommaso taps **Import 12 months** on the Season card → verify on live that the anchor = his March
+   half (≈ 1:39) and that the calibration factor is sane (expected ≈ 1.15–1.25).
+   Real-data findings (16 Oct): HR-based VDOT reads 34–38 on easy runs vs ~44–46 on hard ones (hence
+   easy-runs-only fitness); easy-run VDOT slid June 39.7 → now 36.2 (same HR, ~20–25 s/km slower);
+   a hard 5 km at 87 % HRR is not a race (the race rule caught it). Shape today ≈ 45 %
+   (27 km/week, longest 13 km).
+2. **UX & UI**: options drafted in `docs/ux-options.md` (Today-first, Coach feed, Plan calendar, Goal
+   dashboard; recommendation = 4-tab hybrid). He picks → screen-by-screen spec → small PRs (Today first).
+3. To discuss after RP: **Readiness → today's call** (design agreed 13 Oct: in-app, Garmin only, one
+   safe "make it easier" default, Cowork decides bigger changes from a `readiness_days` view; backtest
+   on 120 days first), **Weekly report card**, **Travel mode** (before December: ranges + per-day,
+   `no_gym` / `transit` / `limited`, checks in TS **and** `check_week`).
+4. **Build templates** (before 30 Nov): Cowork designs and proposes them.
+5. Parked: calf / niggle management rules, Monday push (dropped), D1 AI planner, E server Sunday plan.
+6. Measure use after 2–3 weeks: check-ins per week, proposals approved vs edited.
+7. Still open: paste `push_report` (13 lines, in `20261012090000_health.sql`) in the Supabase SQL Editor.
 
 ## Open data points to watch
 

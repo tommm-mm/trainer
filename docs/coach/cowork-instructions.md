@@ -205,6 +205,11 @@ select date, name, km, avg_hr, rpe, decoupling, splits, laps from run_details wh
 -- the splits and laps of one run (the 8×1′ reps, the time trial): kind = 'split' (n = km mark) or 'lap'
 select kind, n, km, seconds, pace_s_per_km, hr, max_hr, label, work from run_splits
 where activity_id = '<activity id>' order by kind, n;
+-- marathon prediction inputs (the app's Season card shows the prediction: race anchor → Daniels VDOT, fitness =
+-- median HR-based VDOT of EASY runs (60–72% HRR) over 6 weeks × calibration on the race, marathon shape).
+-- Read run_vdot on easy runs as a trend (same HR, faster = up); race_like rows are candidate anchors.
+select date, name, km, pace_s_km, avg_hr, hrr, run_vdot, easy, race_like, race_vdot
+from race_prediction_inputs where date >= current_date - 84 order by date;
 -- gym suggestions he accepted this and last week (the app proposes sets × reps @ RIR + add/same/lower weight)
 select x.week_start, t.name template, e.name exercise, x.sets, x.rep_min, x.rep_max, x.target_rir, x.rationale
 from exercise_targets x join template_exercises te on te.id = x.template_exercise_id
