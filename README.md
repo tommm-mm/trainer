@@ -31,6 +31,7 @@ Principle: **automate the plumbing, never the judgment**. AI plans stay `propose
 | E | Automatic Sunday plan (Vercel Cron) | ⏳ |
 | F | Installable app (manifest, icons, `public/sw.js`: pages network-first with the last copy kept offline, `/_next/static` cached) + push notifications (Settings page: turn on per phone, test button, what to notify, reminder time / timezone). Proposals: triggers queue events in `push_outbox`, one summary after 2 quiet minutes; check-in reminder once a day at your time if today has none. pg_cron (every 5′) → `push_tick()` → `GET /api/push/tick` (secret) → `push_due()` → web-push → `push_report()`. Secrets: Vault (`push_secret`, `push_app_url`) + Vercel env (`PUSH_SECRET`, VAPID keys) | ✅ |
 | H | Health line (Settings): last Garmin sync (stamped on `athlete_settings.last_sync_at` / `last_sync_error` by every sync), last notification check (`push_health()`: pg_cron `push-tick` + the app's HTTP answer), last notification delivered (`notification_settings.last_push_at`, stamped by `push_report`). Sync amber after 24 h or a failed attempt, red after 72 h (also a banner on the Week View); tick red when off / failed / silent > 15 min (`src/lib/health.ts`). The proposal summary adds the first proposed week's km and key session. Migration `20261012090000_health.sql` | ✅ |
+| RP | Marathon prediction + race pace (Season page card): predicted time vs the goal (range, 4-week trend) from three estimates: race anchor (best race-like effort of the last 12 months → Daniels VDOT), fitness (median HR-based VDOT of easy runs over 6 weeks, calibrated on the anchor) and marathon shape (weekly km vs 60, longest run vs 30 km); race-pace segments (laps / km splits at MP ± 10 s and threshold pace) with HR at MP per week. 12-month Garmin import from the card. View `race_prediction_inputs` for Cowork (`src/lib/race-predict.ts`, `src/lib/race-pace.ts`) | ✅ |
 | U | UX/UI review: missing tools and features, cleaner and more intuitive screens (after the coach works end to end) | ⏳ |
 | Later | "Ask coach" chat in the app; next season after Padova | ⏳ |
 
@@ -109,6 +110,10 @@ Pure functions, unit-tested (`npm test`), shared by the Stats page and the AI co
 | Monotony / strain | `mean daily load / SD` per ISO week (rest days = 0); strain = `weekly load × monotony` |
 | Long-run share | `longest run / weekly run km`; guideline 30–35% |
 | Easy runs | RPE ≤ 4, or unrated with HRR ≤ 75% |
+| VDOT (`src/lib/race-predict.ts`) | Daniels–Gilbert: `VO₂(v) = −4.60 + 0.182258 v + 0.000104 v²` (v m/min) ÷ `0.8 + 0.1894393 e^(−0.012778 t) + 0.2989558 e^(−0.1932605 t)` (t min); race time by bisection. Matches Daniels' tables within ~10 s |
+| Race anchor | Best race-like run ≥ 5 km in 12 months: named like a race, or HRR ≥ Daniels' sustainable share for its duration − 4 points (≥ 90% for 24′, ≥ 81% for 1:39) |
+| Fitness (HR-based VDOT) | Per run `(VO₂(v) − 3.5) / HRR + 3.5` (Swain %VO₂R ≈ %HRR); median of easy runs (HRR 60–72%) over 6 weeks × calibration (anchor VDOT ÷ the same median in the 6 weeks before the race). Easy only: HR-based VDOT reads ~15% low on easy runs and right on hard ones, so mixing would track the training mix |
+| Marathon shape / prediction | Shape = ⅔ min(1, weekly km ÷ 60) + ⅓ min(1, longest run ÷ 30), last 6 weeks; marathon VDOT × (1 − 0.1 × (1 − shape)); range ± √(3%² + (SD/√n ÷ VDOT)²) |
 | Efficiency Factor | `speed (m/min) / avg HR` on easy runs, also shown as pace at 65% HRR |
 
 History: the Stats page offers a one-time 120-day Garmin import while there are < 12 weeks of activities.

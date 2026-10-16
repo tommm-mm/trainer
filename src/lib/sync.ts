@@ -35,6 +35,8 @@ export type SyncResult = {
 
 /** How far back the one-time history import reaches (12 weeks + ACWR warm-up). */
 export const BACKFILL_DAYS = 120;
+/** The longer one-time import: 12 months, so a race to anchor the marathon prediction is in. */
+export const RACE_HISTORY_DAYS = 365;
 
 /**
  * `backfillDays` re-reads a longer window (one-time history import); the
