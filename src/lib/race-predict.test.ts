@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  findAnchor, fitnessIn, hrRunVdot, isRaceLike, marathonShape, MARATHON_M, predictMarathon, raceTime,
+  findAnchor, fitnessIn, hrRunVdot, isPlannedTest, isRaceLike, marathonShape, MARATHON_M, predictMarathon, raceTime,
   vdotFromRace, type RunInput,
 } from "./race-predict";
 import { bands, mpHrSlope, mpWeeks, segmentsOf } from "./race-pace";
@@ -46,10 +46,11 @@ describe("runs", () => {
     expect(hrRunVdot({ ...easy("2026-10-01"), avg_hr: 60 }, A)).toBeNull(); // HRR < 50 %
   });
 
-  it("finds the race by name or by near-max HR, best VDOT wins", () => {
-    // 10 km in 48:20 at 89 % HRR: a race by HR (needs ≥ 87 % for 48′), but slower than the half
+  it("finds races by plan, name or race-level HR; the most recent one anchors", () => {
+    // 10 km in 48:20 at 89 % HRR: a race by HR (needs ≥ 87 % for 48′), slower than the half but newer
     const runs = [easy("2026-03-10"), HALF, { ...easy("2026-05-01", 10, 290, 179), name: null }];
-    const a = findAnchor(runs, A, "2025-10-16", "2026-10-16")!;
+    expect(findAnchor(runs, A, "2025-10-16", "2026-10-16")!.date).toBe("2026-05-01");
+    const a = findAnchor(runs.slice(0, 2), A, "2025-10-16", "2026-10-16")!;
     expect(a.date).toBe("2026-03-15");
     expect(formatDuration(a.marathon)).toBe("3:25:45"); // 21.1 km in 1:39
     expect(findAnchor([easy("2026-03-10")], A, "2025-10-16", "2026-10-16")).toBeNull();
@@ -59,6 +60,11 @@ describe("runs", () => {
     expect(isRaceLike({ ...tempo, avg_hr: 182 }, A)).toBe(true);
     expect(findAnchor([tempo], A, "2025-10-16", "2026-10-16")).toBeNull();
     expect(findAnchor([{ ...easy("2026-05-01", 10, 290, 179), name: null }], A, "2025-10-16", "2026-10-16")?.km).toBe(10);
+    // …but the plan said "5 km time trial": it counts (his max HR 192: 88 % HRR)
+    const A192 = { rest: 48, max: 192 };
+    expect(isRaceLike({ ...tempo, planned_test: true }, A192)).toBe(true);
+    // a planned "test" run easy (HR 147, 69 %) doesn't
+    expect(isRaceLike({ ...easy("2026-10-16", 6, 390, 147), planned_test: true }, A192)).toBe(false);
     // Outside the 12 months: ignored
     expect(findAnchor([HALF], A, "2026-04-01", "2026-10-16")).toBeNull();
   });
@@ -80,6 +86,17 @@ describe("runs", () => {
     expect(s.weeklyKm).toBeCloseTo(35, 0);
     expect(s.longRunKm).toBe(10);
     expect(s.pct).toBeCloseTo((2 / 3) * (35 / 60) + (1 / 3) * (10 / 30), 1);
+  });
+});
+
+describe("isPlannedTest", () => {
+  it("races, time trials and tests from the plan; not threshold tests", () => {
+    expect(isPlannedTest({ session_type: "tempo", notes: "5 km time trial, in the morning." })).toBe(true);
+    expect(isPlannedTest({ session_type: "race", notes: null })).toBe(true);
+    expect(isPlannedTest({ session_type: "long_run", notes: "Gara: Bologna 30 km" })).toBe(true);
+    expect(isPlannedTest({ session_type: "tempo", notes: "30′ threshold test: avg HR of the last 20′" })).toBe(false);
+    expect(isPlannedTest({ session_type: "easy_run", notes: "Easy, HR 143–157" })).toBe(false);
+    expect(isPlannedTest({ session_type: "easy_run", notes: "Attesta: latest" })).toBe(false); // whole words only
   });
 });
 
@@ -105,6 +122,20 @@ describe("predictMarathon", () => {
     const p = predictMarathon([...before, HALF, ...slow, ...fast], A, "2026-10-16");
     expect(p.potential!).toBeLessThan(p.anchor!.marathon);
     expect(p.trend!).toBeLessThan(0);
+  });
+
+  it("his case: March half (45.7) + 16 Oct 5 km TT (40.9) → the TT anchors, the half is context", () => {
+    const A192 = { rest: 48, max: 192 };
+    const now = block("2026-09-05", 21, (d) => easy(d));
+    const tt: RunInput = { date: "2026-10-16", name: "Rotterdam Running", distance_km: 5, duration_min: 1419 / 60, avg_hr: 175, planned_test: true };
+    const p = predictMarathon([...before, HALF, ...now, tt], A192, "2026-10-16");
+    expect(p.anchor?.date).toBe("2026-10-16");
+    expect(p.anchor!.vdot).toBeCloseTo(40.9, 1); // 5.00 km in 23:39
+    expect(p.best?.date).toBe("2026-03-15");
+    // calibrated on the TT: fitness = the TT's VDOT, potential = its marathon equivalent
+    expect(p.potential!).toBeCloseTo(p.anchor!.marathon, -1);
+    expect(formatDuration(p.anchor!.marathon)).toBe("3:45:25");
+    expect(p.seconds!).toBeGreaterThan(p.potential!);
   });
 
   it("no anchor → no calibrated fitness, no prediction", () => {

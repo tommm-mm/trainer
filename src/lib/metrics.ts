@@ -18,8 +18,8 @@ export type ActivityInput = Pick<
 
 /** Resting HR used when intervals.icu has no wellness data (user-reported). */
 export const DEFAULT_REST_HR = 46;
-/** Max HR never goes below this (user-reported 195–199); observed peaks can raise it. */
-export const MAX_HR_FLOOR = 195;
+/** Max HR never goes below this: highest seen (192, 19 Jun 2026; an all-out 5 km peaked at 187), confirmed by Tommaso 16 Oct. Observed peaks can raise it. */
+export const MAX_HR_FLOOR = 192;
 
 export type HrAnchors = {
   rest: number;
