@@ -184,7 +184,7 @@ function HowComputed({ model }: { model: StatsModel }) {
         strength work barely lifts HR; anything else uses 5. Gym workouts logged without the watch count
         with the logger&apos;s duration × your session RPE; linked ones count once, through Garmin. Rate sessions on the{" "}
         <Link href="/" className="text-emerald-400">
-          Week
+          Today
         </Link>{" "}
         feedback card to replace estimates.
       </p>
