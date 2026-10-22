@@ -204,7 +204,12 @@ export function SeasonView({
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <PageShell active="/season">
-      <h1 className="mb-4 text-xl font-semibold tracking-tight">Season</h1>
+      <div className="mb-4 flex items-baseline justify-between">
+        <h1 className="text-xl font-semibold tracking-tight">Season</h1>
+        <Link href="/analytics" className="text-sm text-emerald-400">
+          Stats →
+        </Link>
+      </div>
       <div className="flex flex-col gap-4">{children}</div>
     </PageShell>
   );
