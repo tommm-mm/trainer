@@ -206,8 +206,8 @@ function Shell({ children }: { children: React.ReactNode }) {
     <PageShell active="/season">
       <div className="mb-4 flex items-baseline justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Season</h1>
-        <Link href="/analytics" className="text-sm text-emerald-400">
-          Stats →
+        <Link href="/progress" className="text-sm text-emerald-400">
+          ← Progress
         </Link>
       </div>
       <div className="flex flex-col gap-4">{children}</div>

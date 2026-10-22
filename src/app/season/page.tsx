@@ -6,10 +6,6 @@ import { flattenWeeks } from "@/lib/season/model";
 import { weeklyActuals } from "@/lib/season/progress";
 import { historyBefore, loadSeasons } from "@/lib/season/queries";
 import { SeasonView } from "./season-view";
-import { isPlannedTest, predictMarathon } from "@/lib/race-predict";
-import { mpHrSlope, mpWeeks, segmentsOf } from "@/lib/race-pace";
-import type { RaceParams } from "@/lib/domain";
-import type { RaceForecast } from "./race-card";
 
 export default async function SeasonPage({ searchParams }: PageProps<"/season">) {
   const { view } = await searchParams;
@@ -27,29 +23,12 @@ export default async function SeasonPage({ searchParams }: PageProps<"/season">)
     .filter((s) => s !== null)
     .map((s) => flattenWeeks(s.blocks)[0]?.week_start ?? today)
     .sort()[0];
-  const [actsRes, workoutsRes, athlete, history, runsRes, testsRes] = await Promise.all([
+  const [actsRes, workoutsRes, athlete, history] = await Promise.all([
     supabase.from("activities").select("date, type, distance_km").gte("date", start).lte("date", today),
     supabase.from("workouts").select("date").eq("status", "completed").gte("date", start),
     loadAthlete(supabase, today),
     historyBefore(supabase, start),
-    // Marathon prediction: 12 months of runs (race anchor), run detail only for the pace tracker window.
-    supabase
-      .from("activities")
-      .select("date, name, distance_km, duration_min, avg_hr, run_detail")
-      .eq("type", "run")
-      .gte("date", addDays(today, -365))
-      .lte("date", today)
-      .order("date"),
-    // Races / time trials / tests the plan scheduled: they anchor the prediction.
-    supabase
-      .from("weekly_plans")
-      .select("day, session_type, notes")
-      .gte("day", addDays(today, -365))
-      .lte("day", today)
-      .neq("status", "proposed"),
   ]);
-  const testDays = new Set((testsRes.data ?? []).filter(isPlannedTest).map((p) => p.day));
-  const forecast = raceForecast(goal.params as RaceParams, runsRes.data ?? [], athlete.anchors, today, testDays);
   // Load and zones from 4 weeks before the season (load ACWR seed) to this week.
   const loadFrom = addDays(start, -28);
   const thisMonday = mondayOf(today);
@@ -74,49 +53,9 @@ export default async function SeasonPage({ searchParams }: PageProps<"/season">)
       history={history}
       loads={loads}
       zones={zones}
-      forecast={forecast}
       loadHistory={loadWeekList
         .filter((w) => w < start)
         .map((w) => ({ week_start: w, total: loads.get(w)?.total ?? 0, run: loads.get(w)?.run ?? 0 }))}
     />
   );
-}
-
-const PACE_WEEKS = 12;
-
-/** Prediction + race-pace tracker for a goal with a target time and distance; null otherwise. */
-function raceForecast(
-  p: RaceParams,
-  rows: { date: string; name: string | null; distance_km: number | null; duration_min: number | null; avg_hr: number | null; run_detail: unknown }[],
-  anchors: { rest: number; max: number },
-  today: string,
-  testDays: Set<string>,
-): RaceForecast | null {
-  if (!p.target_time_seconds || !p.distance_km) return null;
-  const mp = Math.round(p.target_time_seconds / p.distance_km);
-  const runs = rows
-    .filter((r) => r.distance_km !== null && r.duration_min !== null)
-    .map((r) => ({ date: r.date, name: r.name, distance_km: Number(r.distance_km), duration_min: Number(r.duration_min), avg_hr: r.avg_hr }));
-  // On a planned test day the test is the longest run (warm-up and cool-down are separate activities).
-  for (const day of testDays) {
-    const main = runs.filter((r) => r.date === day).sort((x, y) => y.distance_km - x.distance_km)[0];
-    if (main) Object.assign(main, { planned_test: true });
-  }
-  const segments = segmentsOf(
-    rows
-      .filter((r) => r.date >= addDays(today, -7 * PACE_WEEKS))
-      .map((r) => ({ date: r.date, run_detail: (r.run_detail ?? null) as Parameters<typeof segmentsOf>[0][number]["run_detail"] })),
-    mp,
-    anchors,
-  );
-  const weeks = mpWeeks(segments);
-  return {
-    target: p.target_time_seconds,
-    mp,
-    prediction: predictMarathon(runs, anchors, today),
-    segments,
-    mpWeeks: weeks,
-    mpSlope: mpHrSlope(weeks),
-    oldestRun: runs[0]?.date ?? null,
-  };
 }

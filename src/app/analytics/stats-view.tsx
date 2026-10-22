@@ -24,106 +24,6 @@ export function Badge({ status, value }: { status: Status; value?: string | null
   );
 }
 
-export function StatsView({ model }: { model: StatsModel }) {
-  return (
-    <div className="flex flex-col gap-4">
-      <CoachRead model={model} />
-
-      <Tiles tiles={model.tiles} />
-
-      {model.blocks.map((b) => (
-        <ChartCard key={b.id} block={b} />
-      ))}
-
-      {model.gym && (
-        <>
-          <h2 id="gym" className="mt-4 scroll-mt-4 text-lg font-semibold tracking-tight">
-            Gym
-          </h2>
-          {model.gym.hasData ? (
-            <>
-              <Tiles tiles={model.gym.tiles} />
-              {model.gym.blocks.map((b) => (
-                <ChartCard key={b.id} block={b} />
-              ))}
-            </>
-          ) : (
-            <p className={`${cardCls} text-sm text-neutral-400`}>
-              No workouts logged yet. Log one in the{" "}
-              <Link href="/gym" className="text-emerald-400">
-                Gym
-              </Link>{" "}
-              tab and this section fills in: strength per lift, sets per muscle, records.
-            </p>
-          )}
-        </>
-      )}
-
-      <HowComputed model={model} />
-    </div>
-  );
-}
-
-function Tiles({ tiles }: { tiles: StatsModel["tiles"] }) {
-  return (
-    <section className="grid grid-cols-2 gap-2">
-      {tiles.map((t) => (
-        <div key={t.label} className="rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2">
-          <p className="text-[11px] uppercase tracking-wide text-neutral-500">{t.label}</p>
-          <p className="text-lg font-semibold">{t.value}</p>
-          {t.verdict && t.verdict.status !== "na" && (
-            <p className="text-[11px]" style={{ color: STATUS_COLOR[t.verdict.status] }}>
-              {ICON[t.verdict.status]} {STATUS_LABEL[t.verdict.status]}
-            </p>
-          )}
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function CoachRead({ model }: { model: StatsModel }) {
-  if (model.coach.length === 0 && model.onPoint.length === 0) return null;
-  return (
-    <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-      <h2 className="mb-2 text-sm font-semibold text-emerald-300">Coach&apos;s read</h2>
-      {model.coach.length === 0 && (
-        <p className="mb-2 text-sm text-neutral-200">Nothing to fix right now. Keep doing what you&apos;re doing.</p>
-      )}
-      <ul className="flex flex-col gap-2.5">
-        {model.coach.map((i) => (
-          <li key={i.id}>
-            <a href={`#${i.anchor ?? i.id}`} className="block">
-              <div className="mb-0.5 flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-neutral-100">{i.title}</span>
-                <Badge status={i.verdict.status} value={i.verdict.value} />
-              </div>
-              <p className="text-xs leading-relaxed text-neutral-300">{i.verdict.message}</p>
-            </a>
-          </li>
-        ))}
-      </ul>
-      {model.onPoint.length > 0 && (
-        <p className="mt-3 border-t border-emerald-500/20 pt-2 text-xs text-neutral-300">
-          <span style={{ color: STATUS_COLOR.good }}>✓ On point:</span>{" "}
-          {model.onPoint.map((o, i) => (
-            <span key={o.id}>
-              {i > 0 && " · "}
-              <a href={`#${o.anchor ?? o.id}`} className="underline decoration-neutral-600 underline-offset-2">
-                {o.title}
-              </a>
-              {o.value && <span className="text-neutral-500"> {o.value}</span>}
-            </span>
-          ))}
-        </p>
-      )}
-      <p className="mt-2 text-[11px] text-neutral-500">
-        Rule-based, from the charts below. Tap a line to jump to its chart.
-      </p>
-    </section>
-  );
-}
-
 function ChartCard({ block }: { block: Block }) {
   const v: Verdict | null = block.verdict;
   return (
@@ -194,5 +94,72 @@ function HowComputed({ model }: { model: StatsModel }) {
         what the AI coach will read later.
       </p>
     </section>
+  );
+}
+
+export type StatsGroup = "running" | "body" | "gym";
+const BODY_IDS = new Set(["weight", "body-fat", "hrv", "resting-hr", "sleep"]);
+const MAIN_CHART: Record<StatsGroup, string> = { running: "volume", body: "hrv", gym: "gym-volume" };
+
+/** Progress tab: one group's PT read, its main chart, the rest folded. */
+export function StatsGroupView({ model, group }: { model: StatsModel; group: StatsGroup }) {
+  const blocks =
+    group === "gym"
+      ? (model.gym?.hasData ? model.gym.blocks : [])
+      : model.blocks.filter((b) => BODY_IDS.has(b.id) === (group === "body"));
+  const ids = new Set(blocks.map((b) => b.id));
+  const read = model.coach.filter((i) => ids.has(i.anchor ?? i.id));
+  const ok = model.onPoint.filter((o) => ids.has(o.anchor ?? o.id));
+  const main = blocks.find((b) => b.id === MAIN_CHART[group]) ?? blocks[0];
+  const rest = blocks.filter((b) => b !== main);
+
+  if (group === "gym" && !model.gym?.hasData) {
+    return (
+      <p className="rounded-2xl bg-neutral-900 p-4 text-sm text-neutral-400">
+        No workouts logged yet. Log one in the{" "}
+        <Link href="/gym" className="text-emerald-400">
+          Gym
+        </Link>{" "}
+        tab and this fills in: strength per lift, sets per muscle, records.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      {(read.length > 0 || ok.length > 0) && (
+        <section className="flex flex-col gap-2.5 rounded-2xl bg-neutral-900 p-4">
+          <p className="text-[11px] uppercase tracking-wider text-neutral-400">PT&apos;s read</p>
+          {read.map((i) => (
+            <a key={i.id} href={`#${i.anchor ?? i.id}`} className="block">
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">{i.title}</span>
+                <Badge status={i.verdict.status} value={i.verdict.value} />
+              </span>
+              <span className="text-xs leading-relaxed text-neutral-400">{i.verdict.message}</span>
+            </a>
+          ))}
+          {ok.map((o) => (
+            <a key={o.id} href={`#${o.anchor ?? o.id}`} className="flex items-center justify-between gap-2">
+              <span className="text-sm">{o.title}</span>
+              <Badge status="good" value={o.value} />
+            </a>
+          ))}
+        </section>
+      )}
+      {main && <ChartCard block={main} />}
+      {rest.length > 0 && (
+        <details className="group flex flex-col gap-4">
+          <summary className="cursor-pointer rounded-2xl bg-neutral-900 px-4 py-3 text-sm text-neutral-300">
+            All {group} charts ({rest.length})
+          </summary>
+          <div className="mt-4 flex flex-col gap-4">
+            {rest.map((b) => (
+              <ChartCard key={b.id} block={b} />
+            ))}
+          </div>
+        </details>
+      )}
+      {group !== "gym" && <HowComputed model={model} />}
+    </div>
   );
 }
