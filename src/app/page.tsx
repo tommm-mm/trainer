@@ -90,7 +90,7 @@ export default async function TodayPage() {
           {proposals > 0 && (
             <Link href="/plan#proposals" className="flex items-center gap-3 rounded-2xl bg-neutral-900 p-4">
               <div className="flex-1">
-                <p className="text-[15px] font-semibold">Cowork proposals</p>
+                <p className="text-[15px] font-semibold">PT proposals</p>
                 <p className="text-sm text-neutral-400">
                   {proposals} change{proposals === 1 ? "" : "s"} to approve
                 </p>

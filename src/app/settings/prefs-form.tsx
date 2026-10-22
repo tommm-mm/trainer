@@ -15,7 +15,7 @@ export function PrefsForm({ prefs }: { prefs: Prefs }) {
         <span>
           Proposals to approve
           <span className="block text-xs text-neutral-500">
-            One summary when Cowork proposes sessions, changes or a new season version (after 2 quiet minutes).
+            One summary when your PT proposes sessions, changes or a new season version (after 2 quiet minutes).
           </span>
         </span>
       </label>

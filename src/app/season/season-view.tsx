@@ -268,7 +268,7 @@ function StarterCard({ draft, goalDate }: { draft: SeasonDraft | null; goalDate:
       <section className={cardCls}>
         <p className="font-medium">No season yet</p>
         <p className="mt-1 text-sm text-neutral-400">
-          Your coach (Cowork, or the AI coach from Phase D) will propose one here. Nothing applies until you approve it.
+          Your PT will propose one here. Nothing applies until you approve it.
         </p>
       </section>
     );
