@@ -3,11 +3,11 @@ import { LiveRefresh } from "./live-refresh";
 import { ServiceWorkerRegister } from "./sw-register";
 
 // The four tabs. A tab also lights up on the screens it leads to
-// (Progress: Season, Stats, Goal; Gym: templates and the run log).
+// (Progress: Season plan, Goal; Gym: templates and the run log).
 const TABS = [
   { href: "/", label: "Today", also: [] as string[], icon: <path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM12 8v4l3 2" /> },
   { href: "/plan", label: "Plan", also: [], icon: <path d="M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM4 10h16M9 3v4M15 3v4" /> },
-  { href: "/season", label: "Progress", also: ["/analytics", "/goal"], icon: <path d="M4 19l5-6 4 3 7-9" /> },
+  { href: "/progress", label: "Progress", also: ["/season", "/analytics", "/goal"], icon: <path d="M4 19l5-6 4 3 7-9" /> },
   { href: "/gym", label: "Gym", also: ["/log"], icon: <path d="M3 12h2M19 12h2M7 8v8M17 8v8M7 12h10" /> },
 ];
 
