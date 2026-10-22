@@ -1,4 +1,5 @@
 import { PageShell } from "@/components/bottom-nav";
+import { PageHeader } from "@/components/page-header";
 import { btnDanger } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { formatDay, isISODate, todayISO } from "@/lib/dates";
@@ -46,14 +47,11 @@ export default async function LogPage({ searchParams }: PageProps<"/log">) {
 
   return (
     <PageShell active="/gym">
-      <h1 className="mb-1 text-xl font-semibold tracking-tight">Log a run</h1>
-      <p className="mb-4 text-sm text-neutral-400">
-        For runs without the watch. Garmin runs sync by themselves; gym sessions go in the{" "}
-        <a href="/gym" className="text-emerald-400">
-          gym logger
-        </a>
-        .
-      </p>
+      <PageHeader
+        back={{ href: "/plan", label: "Plan" }}
+        title="Log a run"
+        sub="For runs without the watch. Garmin runs sync by themselves; gym sessions go in the Gym tab."
+      />
 
       <LogForm
         // Re-mount when switching between planned sessions.
@@ -75,7 +73,7 @@ export default async function LogPage({ searchParams }: PageProps<"/log">) {
         {recent.length === 0 ? (
           <p className="text-sm text-neutral-600">Nothing logged yet.</p>
         ) : (
-          <ul className="divide-y divide-neutral-800 rounded-xl border border-neutral-800">
+          <ul className="divide-y divide-neutral-800 rounded-2xl bg-neutral-900">
             {recent.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                 <div className="min-w-0">

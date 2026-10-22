@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageShell } from "@/components/bottom-nav";
+import { PageHeader } from "@/components/page-header";
 import { StatusChip } from "@/components/status-chip";
 import { TargetMeters } from "@/components/season-targets";
 import { btnDanger, btnPrimary, btnSmall, cardCls } from "@/components/ui";
@@ -204,12 +205,7 @@ export function SeasonView({
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <PageShell active="/season">
-      <div className="mb-4 flex items-baseline justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Season</h1>
-        <Link href="/progress" className="text-sm text-emerald-400">
-          ← Progress
-        </Link>
-      </div>
+      <PageHeader back={{ href: "/progress", label: "Progress" }} title="Season plan" />
       <div className="flex flex-col gap-4">{children}</div>
     </PageShell>
   );

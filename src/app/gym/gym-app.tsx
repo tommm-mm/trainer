@@ -117,6 +117,11 @@ export function GymApp({
         finished={finished}
         planned={planned}
         muscles={liveMuscles}
+        eyebrow={
+          [blockCtx?.block, STEP_NOTE[blockCtx?.step ?? "base"], `${weekSessions.length} done this week`]
+            .filter(Boolean)
+            .join(" · ") || null
+        }
         onDismiss={() => setFinished(null)}
         onStart={(template, planId) => {
           setFinished(null);
@@ -155,6 +160,14 @@ export function GymApp({
 
 // ---------------------------------------------------------------- home
 
+/** This week's block step, one line under the Gym title. */
+const STEP_NOTE: Record<string, string | null> = {
+  base: null,
+  plus_set: "+1 set",
+  last_set_rir0: "last set RIR 0",
+  deload: "deload",
+};
+
 function Home({
   templates,
   blockTemplateIds,
@@ -165,7 +178,9 @@ function Home({
   muscles,
   onStart,
   onDismiss,
+  eyebrow,
 }: {
+  eyebrow: string | null;
   templates: TemplateInput[];
   blockTemplateIds: string[] | null;
   byId: Map<string, ExerciseInfo>;
@@ -193,13 +208,13 @@ function Home({
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex items-start justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Gym</h1>
-          <p className="text-sm text-neutral-400">Pick a workout and log sets as you go.</p>
+      <header className="flex items-end justify-between gap-2">
+        <div className="min-w-0">
+          {eyebrow && <p className="truncate text-xs uppercase tracking-wider text-neutral-400">{eyebrow}</p>}
+          <h1 className="text-3xl font-bold tracking-tight">Gym</h1>
         </div>
-        <Link href="/gym/templates" className="shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-xs text-neutral-300">
-          Edit workouts
+        <Link href="/gym/templates" className="shrink-0 pb-1 text-sm text-emerald-400">
+          Templates ›
         </Link>
       </header>
 
@@ -270,7 +285,7 @@ function Home({
       {recent.length > 0 && (
         <section>
           <h2 className="mb-2 text-[11px] uppercase tracking-wide text-neutral-500">Recent</h2>
-          <ul className="flex flex-col divide-y divide-neutral-800 rounded-xl border border-neutral-800">
+          <ul className="flex flex-col divide-y divide-neutral-800 rounded-2xl bg-neutral-900">
             {recent.slice(0, 8).map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span>

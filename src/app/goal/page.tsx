@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageShell } from "@/components/bottom-nav";
+import { PageHeader } from "@/components/page-header";
 import { btnDanger, btnPrimary, cardCls } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/database.types";
@@ -31,7 +32,7 @@ export default async function GoalPage() {
 
   return (
     <PageShell active="/season">
-      <h1 className="mb-4 text-xl font-semibold tracking-tight">Goal</h1>
+      <PageHeader back={{ href: "/progress", label: "Progress" }} title="Goal" />
 
       {error && (
         <p className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-300">
@@ -65,7 +66,7 @@ export default async function GoalPage() {
       {history.length > 0 && (
         <section className="mt-8">
           <h2 className="mb-2 text-sm font-semibold text-neutral-300">History</h2>
-          <ul className="divide-y divide-neutral-800 rounded-xl border border-neutral-800">
+          <ul className="divide-y divide-neutral-800 rounded-2xl bg-neutral-900">
             {history.map((g) => (
               <li key={g.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                 <div className="min-w-0">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageShell } from "@/components/bottom-nav";
+import { PageHeader } from "@/components/page-header";
 import { btnDanger } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveGoal } from "@/lib/queries";
@@ -51,12 +52,11 @@ export default async function CheckinPage({ searchParams }: PageProps<"/checkin"
 
   return (
     <PageShell active="/checkin">
-      <header className="mb-4">
-        <h1 className="text-xl font-semibold tracking-tight">Check-in</h1>
-        <p className="text-sm text-neutral-400">
-          30 seconds on how you&apos;re doing. The coach reads this next to your training.
-        </p>
-      </header>
+      <PageHeader
+        back={{ href: "/", label: "Today" }}
+        title="Check-in"
+        sub="30 seconds on how you're doing. Your PT reads this next to your training."
+      />
 
       {loadError && (
         <p className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-300">
@@ -98,7 +98,7 @@ export default async function CheckinPage({ searchParams }: PageProps<"/checkin"
         {history.length === 0 ? (
           <p className="text-sm text-neutral-600">No check-ins yet.</p>
         ) : (
-          <ul className="divide-y divide-neutral-800 rounded-xl border border-neutral-800">
+          <ul className="divide-y divide-neutral-800 rounded-2xl bg-neutral-900">
             {history.map((h) => (
               <li
                 key={h.date}
