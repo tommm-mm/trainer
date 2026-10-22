@@ -8,7 +8,7 @@ import { resolveFlag } from "./week/actions";
 import { SyncButton } from "./week/sync-button";
 import { FeedbackCard } from "./week/feedback-card";
 import { QuickCheckin } from "./week/quick-checkin";
-import { loadWeek, type WeekData } from "./week/load";
+import { dayState, loadWeek, type WeekData } from "./week/load";
 import { ReadinessCard } from "./today/readiness-card";
 import { SessionCard } from "./today/session-card";
 
@@ -145,17 +145,13 @@ export default async function TodayPage() {
 
 /** One dot per day: done, planned, missed, rest. Tap → Plan. */
 function WeekStrip({ w }: { w: WeekData }) {
-  const { today, monday, plans, activities, workouts } = w;
-  const days = weekDays(monday).map((day) => {
-    const planned = plans.filter((p) => p.day === day && p.status !== "proposed");
-    const did = activities.some((a) => a.date === day && a.type !== "other") || workouts.some((x) => x.date === day);
-    const state = did ? "done" : day === today ? "today" : planned.length === 0 ? "rest" : day < today ? "missed" : "planned";
-    return { day, state };
-  });
+  const days = weekDays(w.monday).map((day) => ({ day, state: day === w.today && dayState(w, day) !== "done" ? "today" : dayState(w, day) }));
   const dot: Record<string, string> = {
     done: "h-3.5 w-3.5 bg-emerald-400",
     today: "h-3.5 w-3.5 border-2 border-neutral-100",
     planned: "h-3.5 w-3.5 border-2 border-neutral-600",
+    changed: "h-3.5 w-3.5 bg-amber-400",
+    proposed: "h-3.5 w-3.5 border-2 border-dashed border-emerald-500",
     missed: "h-3.5 w-3.5 bg-red-400",
     rest: "h-1.5 w-1.5 bg-neutral-700",
   };

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { PageShell } from "@/components/bottom-nav";
-import { cardCls, btnSmall } from "@/components/ui";
+import { cardCls } from "@/components/ui";
 import type { Tables } from "@/lib/database.types";
-import { addDays, daysBetween, formatDay, formatWeekRange, weekDays } from "@/lib/dates";
+import { addDays, formatDay, formatWeekRange, weekDays } from "@/lib/dates";
 import { formatNumber } from "@/lib/format";
 import { type StrengthSession } from "@/lib/strength";
 import { MuscleMeters } from "@/components/muscle-meters";
@@ -15,33 +15,71 @@ import { CoachInbox } from "@/components/coach-inbox";
 import { approveWeek } from "../week/actions";
 import { PlanRow, type PlanTemplate } from "../week/plan-row";
 import { AddSession } from "../week/add-session";
-import { SyncButton } from "../week/sync-button";
 import { RunDetailView } from "@/components/run-detail";
 
-import { loadWeek } from "../week/load";
+import { dayState, loadWeek, type DayState } from "../week/load";
+import { sessionKind, sessionLabel } from "@/lib/sessions";
 
 export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
-  const { week } = await searchParams;
+  const { week, day: dayParam } = await searchParams;
+  const w = await loadWeek(week);
   const {
-    today, monday, sunday, isCurrentWeek, goal, plans, activities, workouts, templates, templateName,
+    today, monday, sunday, isCurrentWeek, plans, activities, workouts, templates, templateName,
     seasonWeek, weekLoad, inbox, checks, loadError, proposedCount, plannedKm, doneKm, gymDates, gymTarget,
     weekMuscles, syncWarning, lastSyncError,
-  } = await loadWeek(week);
+  } = w;
+  const days = weekDays(monday);
+  // The open day: ?day= when it's in this week, else today (this week) or Monday.
+  const day = typeof dayParam === "string" && days.includes(dayParam) ? dayParam : isCurrentWeek ? today : monday;
+  const weekNo = isoWeek(monday);
+  const block = seasonWeek?.block;
+  const href = (wk: string, d?: string) => `/plan?week=${wk}${d ? `&day=${d}` : ""}`;
 
   return (
     <PageShell active="/plan">
-      <header className="mb-4 flex items-start justify-between">
+      <header className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            {isCurrentWeek ? "This week" : "Week"}
-          </h1>
-          <p className="text-sm text-neutral-400">{formatWeekRange(monday)}</p>
+          <p className="text-xs uppercase tracking-wider text-neutral-400">{formatWeekRange(monday)}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{isCurrentWeek ? "This week" : `Week ${weekNo}`}</h1>
+        </div>
+        <div className="flex gap-2">
+          {!isCurrentWeek && (
+            <Link href="/plan" className="flex h-11 items-center rounded-full bg-neutral-900 px-4 text-sm text-neutral-200">
+              Today
+            </Link>
+          )}
+          <Link href={href(addDays(monday, -7))} aria-label="Previous week" className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-lg">
+            ‹
+          </Link>
+          <Link href={href(addDays(monday, 7))} aria-label="Next week" className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-lg">
+            ›
+          </Link>
         </div>
       </header>
 
-      <div className="mb-3">
-        <SyncButton stale={syncWarning !== null} />
-      </div>
+      {block && seasonWeek && (
+        <Link href="/season" className="mb-4 flex flex-col gap-1.5">
+          <div className="flex gap-1">
+            {block.weeks.map((bw, i) => (
+              <span
+                key={bw.id}
+                className={`h-1.5 flex-1 rounded-full ${
+                  i + 1 === seasonWeek.weekInBlock ? "bg-emerald-400" : i + 1 < seasonWeek.weekInBlock ? "bg-neutral-500" : "bg-neutral-800"
+                }`}
+              />
+            ))}
+          </div>
+          <p className="flex justify-between text-xs text-neutral-400">
+            <span className="font-semibold text-neutral-100">
+              {block.name} · week {seasonWeek.weekInBlock}/{block.weeks.length}
+              {seasonWeek.week.is_deload && " · lighter"}
+            </span>
+            <span>Season ›</span>
+          </p>
+          {seasonWeek.week.key_session && <p className="text-xs text-neutral-300">Key: {seasonWeek.week.key_session}</p>}
+          {seasonWeek.week.milestone && <p className="text-xs text-amber-300">⚑ {seasonWeek.week.milestone}</p>}
+        </Link>
+      )}
 
       {syncWarning && (
         <Link
@@ -56,159 +94,153 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
           <span className="text-neutral-400">Settings →</span>
         </Link>
       )}
-
-      <nav className="mb-4 flex items-center gap-2">
-        <Link href={`/plan?week=${addDays(monday, -7)}`} className={btnSmall}>
-          ‹ Prev
-        </Link>
-        {!isCurrentWeek && (
-          <Link href="/plan" className={btnSmall}>
-            This week
-          </Link>
-        )}
-        <Link href={`/plan?week=${addDays(monday, 7)}`} className={btnSmall}>
-          Next ›
-        </Link>
-        <GoalChip goal={goal} today={today} />
-      </nav>
-
-      {seasonWeek && (
-        <Link href="/season" className={`${cardCls} mb-4 flex flex-col gap-3`}>
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="text-xs uppercase tracking-wide text-emerald-400">
-              {seasonWeek.block.name} · week {seasonWeek.weekInBlock}/{seasonWeek.block.weeks.length}
-              {seasonWeek.week.is_deload && " · lighter"}
-            </p>
-            <span className="text-xs text-neutral-500">Season →</span>
-          </div>
-          <TargetMeters
-            targets={seasonWeek.week}
-            actual={weeklyActuals(
-              activities.map((a) => ({ date: a.date, type: a.type, distance_km: a.distance_km })),
-              workouts.map((w) => w.date),
-            ).get(monday)}
-            finished={sunday < today}
-          />
-          {seasonWeek.week.key_session && (
-            <p className="text-sm text-neutral-300">Key: {seasonWeek.week.key_session}</p>
-          )}
-          {seasonWeek.week.milestone && <p className="text-sm text-amber-300">⚑ {seasonWeek.week.milestone}</p>}
-        </Link>
-      )}
-
-      {weekLoad && monday <= today && (
-        <section className={`${cardCls} mb-4`}>
-          <p className="mb-2 text-xs uppercase tracking-wide text-neutral-500">
-            {isCurrentWeek ? "Load this week" : "Load"}
-          </p>
-          <LoadMeters
-            done={weekLoad.loads.get(monday)}
-            planned={seasonWeek ? plannedLoad(seasonWeek.week, weekLoad.athlete.calibration) : null}
-            zones={weekLoad.zones.get(monday)}
-            focus={seasonWeek?.block.focus}
-            finished={sunday < today}
-          />
-        </section>
-      )}
-
       {loadError && (
         <p className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-300">
           Couldn&apos;t load data: {loadError.message}
         </p>
       )}
 
-      <section className="mb-4 grid grid-cols-3 gap-2">
-        <Stat label="Planned km" value={formatNumber(plannedKm)} />
-        <Stat label="Run km" value={formatNumber(doneKm)} />
-        <Stat label="Gym sessions" value={`${gymDates.length}/${gymTarget}`} />
+      <nav aria-label="Days" className="mb-2 grid grid-cols-7 gap-1 rounded-2xl bg-neutral-900 p-2">
+        {days.map((d, i) => {
+          const state = dayState(w, d);
+          const label = shortLabel(plans.filter((p) => p.day === d), activities.filter((a) => a.date === d), workouts.some((x) => x.date === d));
+          return (
+            <Link
+              key={d}
+              href={href(monday, d)}
+              scroll={false}
+              aria-current={d === day ? "date" : undefined}
+              className={`flex flex-col items-center gap-1 rounded-xl py-2 ${d === day ? "bg-neutral-800" : ""} ${d === today ? "ring-1 ring-emerald-400" : ""}`}
+            >
+              <span className="text-[11px] text-neutral-400">{"MTWTFSS"[i]}</span>
+              <span className="text-[15px] font-semibold tabular-nums">{Number(d.slice(8))}</span>
+              <span className={`rounded-full ${DOT[state]}`} />
+              <span className="w-full truncate px-0.5 text-center text-[10px] text-neutral-300">{label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+      <p className="mb-4 flex flex-wrap gap-x-3 gap-y-1 px-1 text-[11px] text-neutral-400">
+        {LEGEND.map(([state, text]) => (
+          <span key={state} className="flex items-center gap-1.5">
+            <span className={`rounded-full ${DOT[state]}`} />
+            {text}
+          </span>
+        ))}
+      </p>
+
+      <ol className="mb-4">
+        <DayCard
+          day={day}
+          isToday={day === today}
+          plans={plans.filter((p) => p.day === day)}
+          activities={activities.filter((a) => a.date === day)}
+          workouts={workouts.filter((x) => x.date === day)}
+          templates={templates}
+          templateName={templateName}
+        />
+      </ol>
+
+      <section className="mb-4 flex flex-col gap-3 rounded-2xl bg-neutral-900 p-4">
+        <p className="flex justify-between text-[11px] uppercase tracking-wider text-neutral-400">
+          <span>Week vs target</span>
+          <span className="normal-case tracking-normal">
+            {formatNumber(doneKm)} / {formatNumber(seasonWeek?.week.run_km ?? plannedKm)} km · gym {gymDates.length}/{gymTarget}
+          </span>
+        </p>
+        {seasonWeek ? (
+          <TargetMeters
+            targets={seasonWeek.week}
+            actual={weeklyActuals(
+              activities.map((a) => ({ date: a.date, type: a.type, distance_km: a.distance_km })),
+              workouts.map((x) => x.date),
+            ).get(monday)}
+            finished={sunday < today}
+          />
+        ) : (
+          <p className="text-sm text-neutral-400">No approved season: planned {formatNumber(plannedKm)} km.</p>
+        )}
+        {weekLoad && monday <= today && (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-neutral-400">Load · 80/20</summary>
+            <div className="mt-3">
+              <LoadMeters
+                done={weekLoad.loads.get(monday)}
+                planned={seasonWeek ? plannedLoad(seasonWeek.week, weekLoad.athlete.calibration) : null}
+                zones={weekLoad.zones.get(monday)}
+                focus={seasonWeek?.block.focus}
+                finished={sunday < today}
+              />
+            </div>
+          </details>
+        )}
+        {weekMuscles && workouts.length > 0 && (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-neutral-400">Muscle volume</summary>
+            <div className="mt-3">
+              <MuscleMeters sets={weekMuscles} />
+            </div>
+          </details>
+        )}
       </section>
 
-      {weekMuscles && workouts.length > 0 && (
-        <details className={`${cardCls} mb-4`}>
-          <summary className="cursor-pointer text-sm font-medium">
-            Muscle volume this week
-            <span className="ml-2 text-xs font-normal text-neutral-500">tap to open</span>
-          </summary>
-          <div className="mt-3">
-            <MuscleMeters sets={weekMuscles} />
-          </div>
-        </details>
-      )}
+      {plans.length > 0 && <WeekChecks checks={checks} proposed={proposedCount > 0} />}
 
       <div id="proposals" className="scroll-mt-4" />
       {inbox && <CoachInbox items={inbox.items} questions={inbox.questions} />}
 
-      {plans.length > 0 && <WeekChecks checks={checks} proposed={proposedCount > 0} />}
-
-      <div className="mb-4 flex gap-2">
-        <button
-          disabled
-          title="Arrives in Phase 4"
-          className="flex-1 rounded-lg border border-dashed border-neutral-700 py-2 text-sm text-neutral-500"
+      {proposedCount > 0 && (
+        <form
+          action={approveWeek.bind(null, monday)}
+          className="sticky bottom-24 z-10 mb-4 flex items-center justify-between gap-3 rounded-full bg-neutral-100 py-2 pl-5 pr-2 text-neutral-950 shadow-lg shadow-black/50"
         >
-          ✦ Generate my week (soon)
-        </button>
-        {proposedCount > 0 && (
-          <form action={approveWeek.bind(null, monday)}>
-            <button className="h-full rounded-lg bg-emerald-500 px-3 text-sm font-medium text-neutral-950">
-              Approve all ({proposedCount})
-              {checks.some((c) => c.severity === "red") && " · ! red check"}
-            </button>
-          </form>
-        )}
-      </div>
-
-      <ol className="flex flex-col gap-3">
-        {weekDays(monday).map((day) => (
-          <DayCard
-            key={day}
-            day={day}
-            isToday={day === today}
-            plans={plans.filter((p) => p.day === day)}
-            activities={activities.filter((a) => a.date === day)}
-            workouts={workouts.filter((w) => w.date === day)}
-            templates={templates}
-            templateName={templateName}
-          />
-        ))}
-      </ol>
+          <span className="text-sm font-semibold">
+            {proposedCount} session{proposedCount === 1 ? "" : "s"} proposed by your PT
+            {checks.some((c) => c.severity === "red") && <span className="text-red-600"> · red check</span>}
+          </span>
+          <button className="h-10 rounded-full bg-emerald-500 px-4 text-sm font-semibold text-neutral-950">Approve all</button>
+        </form>
+      )}
     </PageShell>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2">
-      <p className="text-[11px] uppercase tracking-wide text-neutral-500">{label}</p>
-      <p className="text-lg font-semibold tabular-nums">{value}</p>
-    </div>
-  );
+const DOT: Record<DayState, string> = {
+  done: "h-2.5 w-2.5 bg-emerald-400",
+  changed: "h-2.5 w-2.5 bg-amber-400",
+  proposed: "h-2.5 w-2.5 border-2 border-dashed border-emerald-500",
+  planned: "h-2.5 w-2.5 border-2 border-neutral-500",
+  missed: "h-2.5 w-2.5 bg-red-400",
+  rest: "h-2.5 w-2.5",
+};
+const LEGEND: [DayState, string][] = [
+  ["done", "done"],
+  ["planned", "planned"],
+  ["changed", "changed"],
+  ["proposed", "proposed"],
+  ["missed", "missed"],
+];
+
+/** One word under each day: what's planned (or what was done). */
+function shortLabel(plans: Tables<"weekly_plans">[], acts: Tables<"activities">[], gym: boolean): string {
+  const p = plans[0];
+  if (p) {
+    const words: Record<string, string> = { easy_run: "Easy", long_run: "Long", tempo: "Tempo", intervals: "Intervals", recovery_run: "Recov", race: "Race" };
+    const kind = sessionKind(p.session_type);
+    const base = words[p.session_type] ?? (kind === "gym" ? "Gym" : sessionLabel(p.session_type));
+    return plans.length > 1 ? `${base}+` : base;
+  }
+  if (acts.some((a) => a.type === "run")) return "Run";
+  if (gym || acts.some((a) => a.type === "gym")) return "Gym";
+  return acts.length ? "Other" : "–";
 }
 
-function GoalChip({ goal, today }: { goal: Tables<"goals"> | null; today: string }) {
-  if (!goal) {
-    return (
-      <Link href="/goal" className="ml-auto text-xs text-amber-300">
-        No active goal →
-      </Link>
-    );
-  }
-  const weeksLeft = goal.target_date
-    ? Math.ceil(daysBetween(today, goal.target_date) / 7)
-    : null;
-  const bits = [
-    goal.title,
-    goal.phase,
-    weeksLeft !== null && weeksLeft >= 0 ? `${weeksLeft} wk` : null,
-  ].filter(Boolean);
-  return (
-    <Link
-      href="/goal"
-      className="ml-auto truncate rounded-full bg-neutral-800 px-2.5 py-1 text-xs text-neutral-300"
-    >
-      {bits.join(" · ")}
-    </Link>
-  );
+/** ISO week number of a Monday. */
+function isoWeek(monday: string): number {
+  const d = new Date(`${monday}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 3);
+  const yearStart = Date.UTC(d.getUTCFullYear(), 0, 1);
+  return Math.ceil(((d.getTime() - yearStart) / 86400000 + 1) / 7);
 }
 
 function DayCard({
@@ -240,9 +272,9 @@ function DayCard({
   const hasLogs = runs.length > 0 || garminGym.length > 0 || workouts.length > 0;
 
   return (
-    <li className={`${cardCls} ${isToday ? "border-emerald-500/50" : ""}`}>
+    <li className="list-none rounded-2xl bg-neutral-900 p-4">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className={`text-sm font-semibold ${isToday ? "text-emerald-400" : ""}`}>
+        <h2 className={`text-base font-semibold ${isToday ? "text-emerald-400" : ""}`}>
           {formatDay(day)}
           {isToday && <span className="ml-2 text-xs font-normal">today</span>}
         </h2>
@@ -253,7 +285,7 @@ function DayCard({
 
       <div className="flex flex-col gap-2">
         {plans.length === 0 && !hasLogs && (
-          <p className="text-xs text-neutral-600">Nothing planned.</p>
+          <p className="text-xs text-neutral-600">Rest day: nothing planned.</p>
         )}
         {plans.map((p) => (
           <PlanRow key={p.id} plan={p} templates={templates} />

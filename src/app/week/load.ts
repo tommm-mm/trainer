@@ -206,3 +206,20 @@ export async function loadWeek(week: string | string[] | undefined) {
 }
 
 export type WeekData = Awaited<ReturnType<typeof loadWeek>>;
+
+export type DayState = "done" | "missed" | "changed" | "proposed" | "planned" | "rest";
+
+/**
+ * One state per day for the week dots and the Plan calendar: done (anything
+ * logged), missed (a past approved session with nothing logged), changed
+ * (you edited it), proposed (waiting for your OK), planned, rest.
+ */
+export function dayState(w: Pick<WeekData, "today" | "plans" | "activities" | "workouts">, day: string): DayState {
+  const plans = w.plans.filter((p) => p.day === day);
+  const did = w.activities.some((a) => a.date === day && a.type !== "other") || w.workouts.some((x) => x.date === day);
+  if (did) return "done";
+  if (plans.length === 0) return "rest";
+  if (plans.every((p) => p.status === "proposed")) return "proposed";
+  if (day < w.today) return "missed";
+  return plans.some((p) => p.status === "edited") ? "changed" : "planned";
+}
