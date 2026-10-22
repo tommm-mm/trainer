@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { signOut } from "../actions";
 import { PageShell } from "@/components/bottom-nav";
+import { PageHeader } from "@/components/page-header";
 import { cardCls } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { PushManager } from "./push-manager";
@@ -43,15 +43,15 @@ export default async function SettingsPage() {
 
   return (
     <PageShell active="/settings">
-      <div className="flex items-center justify-between">
-        <Link href="/" className="text-xs text-neutral-500">
-          ← Today
-        </Link>
-        <form action={signOut}>
-          <button className="text-xs text-neutral-500 hover:text-neutral-300">Sign out</button>
-        </form>
-      </div>
-      <h1 className="mb-4 mt-2 text-xl font-semibold tracking-tight">Settings</h1>
+      <PageHeader
+        back={{ href: "/", label: "Today" }}
+        title="Settings"
+        right={
+          <form action={signOut}>
+            <button className="text-sm text-neutral-400 hover:text-neutral-200">Sign out</button>
+          </form>
+        }
+      />
 
       <section className={`${cardCls} mb-4`}>
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">

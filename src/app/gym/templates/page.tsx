@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageShell } from "@/components/bottom-nav";
+import { PageHeader } from "@/components/page-header";
 import { btnSmall, cardCls } from "@/components/ui";
 import { focusLabel } from "@/lib/gym/templates";
 import { restoreTemplate } from "./actions";
@@ -17,13 +18,11 @@ export default async function TemplatesPage() {
 
   return (
     <PageShell active="/gym">
-      <Link href="/gym" className="text-xs text-neutral-500">
-        ← Gym
-      </Link>
-      <h1 className="mb-1 mt-2 text-xl font-semibold tracking-tight">Workouts</h1>
-      <p className="mb-4 text-sm text-neutral-400">
-        Your templates: sets × rep range @ RIR per exercise. Workouts started afterwards use the new targets.
-      </p>
+      <PageHeader
+        back={{ href: "/gym", label: "Gym" }}
+        title="Templates"
+        sub="Sets × rep range @ RIR per exercise. Workouts started afterwards use the new targets."
+      />
       {error && <p className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-300">{error.message}</p>}
       <ul className="mb-6 flex flex-col gap-2">
         {active.map((t) => {
@@ -52,7 +51,7 @@ export default async function TemplatesPage() {
       {archived.length > 0 && (
         <section className="mt-8">
           <p className="mb-2 text-[11px] uppercase tracking-wide text-neutral-500">Archived (history kept)</p>
-          <ul className="flex flex-col divide-y divide-neutral-800 rounded-xl border border-neutral-800">
+          <ul className="flex flex-col divide-y divide-neutral-800 rounded-2xl bg-neutral-900">
             {archived.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span>
