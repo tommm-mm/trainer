@@ -288,8 +288,11 @@ always picks the kilos).
   ones too (`template_update`), or archive them when they're done.
 - **New exercises:** `exercise_create` first (apply it, read its id), then use it in templates.
 - **Week rules** (`gym_rules_set`): how a week changes the templates. A week with your rules uses
-  them **instead of** the app's default block rules (deload in lighter weeks; in hypertrophy
-  blocks +1 set and last set to RIR 0 before it). `rules: []` = templates exactly as written;
+  them **instead of** the app's default (the app only deloads by itself: half the sets, RIR 3–4,
+  same weights in lighter weeks). **Everything else is your call, on any week, as often as you
+  like**: +1 set, last set to RIR 0, a different set count, rep range or RIR for one exercise or a
+  whole session. If you don't send rules, build weeks use the templates as written.
+  `rules: []` = templates exactly as written;
   `rules: null` = back to the default. Weeks are Mondays; past weeks can't change. You can set a
   whole block in one proposal.
 
@@ -486,18 +489,20 @@ raises if the long run is the next morning). Box jumps first in B.
 When gym drops to 2×/week (Build): **Mon + Thu**, easy bike Wednesday, Saturday free before a
 Sunday long run.
 
-The gym logger applies this table as suggestions (computed from the approved season's lighter
-weeks; he accepts per exercise): +1 set, last set to RIR 0, deload. You don't need to write
-exercise targets for it. Build (30 Nov) needs its templates and, if you want more than double
-progression plus the deload, its week rules: design them, propose them to Tommaso in November
-(tag them `strength` so they appear on 30 Nov; tag A/B/C `hypertrophy`), see "Gym tools".
+The gym logger suggests sets / reps from double progression and, in lighter weeks, the deload
+(half the sets, same weights, RIR 3–4). It does **not** guess +1-set or RIR-0 weeks any more:
+when a week should change (e.g. "+1 set on the upper compounds"), send a `gym_rules_set`
+proposal for that week; writing it only in the season text or the plan notes doesn't reach the
+logger. Tommaso can also edit sets / reps / RIR by hand in the logger: those weeks show up in
+`exercise_targets` with `source = 'manual'` and "set by you" in the rationale (next to what was
+suggested). Build (30 Nov) needs its templates and its week rules: design them, propose them to
+Tommaso in November (tag them `strength` so they appear on 30 Nov; tag A/B/C `hypertrophy`), see
+"Gym tools".
 
-| Week of | Running | Gym |
-|---|---|---|
-| 5 Oct, 2 Nov | build | sets as in the templates; double progression |
-| 12 Oct, 9 Nov | build | +1 set on the two upper-body compounds of each session |
-| 19 Oct, 16 Nov | build | same sets; last set of upper-body accessories to RIR 0 |
-| 26 Oct, 23 Nov | lighter | deload: 2 sessions, half the sets, same weights, RIR 3–4 |
+Example, +1 set on the two upper-body compounds of every session in the week of 26 Oct:
+`payload = {"weeks":[{"week_start":"2026-10-26","rules":[{"match":{"mechanic":"compound","region":"upper","limit":2},"sets_delta":1}],"note":"+1 set on the upper compounds"}]}`
+(kind `gym_rules_set`; one proposal can cover several weeks, e.g. 2 Nov with
+`{"match":{"mechanic":"isolation","region":"upper"},"last_set_rir":0}`).
 
 ## Nutrition reference (set by the previous coach; not actively managed)
 

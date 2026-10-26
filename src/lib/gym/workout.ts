@@ -51,6 +51,8 @@ export type LocalExercise = {
   sets: LocalSet[];
   /** Your decision on the progression suggestion (absent = not decided yet). */
   advice?: { advice: Advice; status: "accepted" | "ignored" } | null;
+  /** You changed the target by hand (sets / reps / RIR): saved as this week's target. */
+  targetEdited?: boolean;
 };
 
 export type WorkoutStatus = "in_progress" | "completed" | "discarded";
@@ -171,6 +173,7 @@ export function decideAdvice(
   return mapExercise(store, weId, (e) => ({
     ...e,
     advice: { advice, status },
+    targetEdited: status === "accepted" ? false : e.targetEdited,
     target:
       status === "accepted"
         ? {
@@ -182,6 +185,32 @@ export function decideAdvice(
           }
         : e.target,
   }));
+}
+
+export type TargetEdit = Partial<Pick<Target, "sets" | "repMin" | "repMax" | "rir">>;
+
+/**
+ * Change today's target by hand: sets 1–10, reps 1–100 (min ≤ max), RIR 0–5.
+ * Nothing is strict: it's your call, saved as this week's target for the PT to see.
+ */
+export function editTarget(store: Store, weId: string, edit: TargetEdit): Store {
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(v)));
+  return mapExercise(store, weId, (e) => {
+    const t: Target = e.target ?? { sets: Math.max(1, e.sets.filter((x) => !x.isWarmup).length), repMin: null, repMax: null, rir: null, restSeconds: null };
+    const sets = clamp(edit.sets ?? t.sets, 1, 10);
+    let repMin = edit.repMin !== undefined ? edit.repMin : t.repMin;
+    let repMax = edit.repMax !== undefined ? edit.repMax : t.repMax;
+    repMin = repMin == null ? null : clamp(repMin, 1, 100);
+    repMax = repMax == null ? null : clamp(repMax, 1, 100);
+    // Keep min ≤ max by moving the other end along with the one you changed.
+    if (repMin != null && repMax != null && repMin > repMax) {
+      if (edit.repMin !== undefined) repMax = repMin;
+      else repMin = repMax;
+    }
+    const rirIn = edit.rir !== undefined ? edit.rir : t.rir;
+    const rir = rirIn == null ? null : clamp(rirIn, 0, 5);
+    return { ...e, target: { ...t, sets, repMin, repMax, rir }, targetEdited: true };
+  });
 }
 
 /** "Accept all": every undecided suggestion in one edit (one rev bump). */
@@ -356,10 +385,11 @@ export type SyncRows = {
     template_exercise_id: string;
     week_start: string;
     sets: number;
-    rep_min: number;
-    rep_max: number;
+    rep_min: number | null;
+    rep_max: number | null;
     target_rir: number | null;
-    source: "engine";
+    /** engine = an accepted suggestion; manual = you edited the target. */
+    source: "engine" | "manual";
     status: "approved";
     rationale: string;
   }[];
@@ -404,25 +434,49 @@ export function toRows(store: Store, now: string): SyncRows {
         logged_at: s.loggedAt,
       })),
     ),
-    targets: d.exercises.flatMap((e) =>
-      e.advice?.status === "accepted" && e.templateExerciseId
-        ? [
-            {
-              template_exercise_id: e.templateExerciseId,
-              week_start: mondayOf(d.date),
-              sets: e.advice.advice.sets,
-              rep_min: e.advice.advice.repMin,
-              rep_max: e.advice.advice.repMax,
-              target_rir: e.advice.advice.rir,
-              source: "engine" as const,
-              status: "approved" as const,
-              rationale: [WEIGHT_LABELS[e.advice.advice.weight], e.advice.advice.blockNote, e.advice.advice.reason]
-                .filter(Boolean)
-                .join(" · "),
-            },
-          ]
-        : [],
-    ),
+    targets: d.exercises.flatMap((e): SyncRows["targets"] => {
+      if (!e.templateExerciseId) return [];
+      const week_start = mondayOf(d.date);
+      // Your own edit wins: saved as a manual target, with what was suggested next to it.
+      if (e.targetEdited && e.target) {
+        const a = e.advice?.advice;
+        return [
+          {
+            template_exercise_id: e.templateExerciseId,
+            week_start,
+            sets: e.target.sets,
+            rep_min: e.target.repMin,
+            rep_max: e.target.repMax,
+            target_rir: e.target.rir,
+            source: "manual" as const,
+            status: "approved" as const,
+            rationale: [
+              "set by you",
+              a ? `suggested ${a.sets} × ${a.repMin}–${a.repMax}${a.rir !== null ? ` @ RIR ${a.rir}` : ""}, ${WEIGHT_LABELS[a.weight]}` : null,
+              a?.blockNote,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          },
+        ];
+      }
+      if (e.advice?.status !== "accepted") return [];
+      return [
+        {
+          template_exercise_id: e.templateExerciseId,
+          week_start,
+          sets: e.advice.advice.sets,
+          rep_min: e.advice.advice.repMin,
+          rep_max: e.advice.advice.repMax,
+          target_rir: e.advice.advice.rir,
+          source: "engine" as const,
+          status: "approved" as const,
+          rationale: [WEIGHT_LABELS[e.advice.advice.weight], e.advice.advice.blockNote, e.advice.advice.reason]
+            .filter(Boolean)
+            .join(" · "),
+        },
+      ];
+    }),
     deleted: store.deleted,
   };
 }

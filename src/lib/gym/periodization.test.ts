@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { blockAdjustments, blockContext, type PlanExercise, type SeasonBlockInput } from "./periodization";
+import { applyRules, type GymRule } from "./rules";
+
+// The PT's week rules for a +1 set week and a RIR-0 week (gym_rules_set).
+const PLUS_SET: GymRule = { match: { mechanic: "compound", region: "upper", limit: 2 }, sets_delta: 1 };
+const RIR0: GymRule = { match: { mechanic: "isolation", region: "upper" }, last_set_rir: 0 };
 import { adviseNext, pendingAdvice, withBlock } from "./progression";
 import { decideAdvice, startWorkout, suggestNextSet, type LastTime } from "./workout";
 
@@ -24,10 +29,10 @@ const A: PlanExercise[] = [
 ];
 
 describe("blockContext", () => {
-  it("follows the agreed Base pattern, counting back from each lighter week", () => {
+  it("only lighter weeks change by default; build weeks keep the template (the PT's rules do the rest)", () => {
     const steps = ["2026-09-28", "2026-10-05", "2026-10-12", "2026-10-19", "2026-10-26", "2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23"]
       .map((m) => blockContext(season, m)?.step);
-    expect(steps).toEqual(["base", "base", "plus_set", "last_set_rir0", "deload", "base", "plus_set", "last_set_rir0", "deload"]);
+    expect(steps).toEqual(["base", "base", "base", "base", "deload", "base", "base", "base", "deload"]);
   });
 
   it("strength blocks keep the template, deload weeks deload, taper counts as lighter", () => {
@@ -39,14 +44,14 @@ describe("blockContext", () => {
 });
 
 describe("blockAdjustments", () => {
-  it("+1 set on the two upper-body compounds only (incline press, pulldown)", () => {
-    const a = blockAdjustments(A, "plus_set");
+  it("a PT rule +1 set on the two upper-body compounds hits incline press and pulldown only", () => {
+    const a = applyRules(A, [PLUS_SET]);
     expect([...a.keys()]).toEqual(["incline", "pulldown"]);
     expect(a.get("incline")).toMatchObject({ sets: 5, rir: 2, weight: null });
   });
 
-  it("last set to RIR 0 on the upper-body accessories", () => {
-    const a = blockAdjustments(A, "last_set_rir0");
+  it("a PT rule last set to RIR 0 hits the upper-body accessories", () => {
+    const a = applyRules(A, [RIR0]);
     expect([...a.keys()]).toEqual(["lateral", "curl", "pushdown"]);
     expect(a.get("curl")).toMatchObject({ sets: 3, lastSetRir: 0 });
   });
@@ -102,7 +107,7 @@ describe("advice with the block on top", () => {
       template: { id: "t", name: "A", items: [{ id: "te", exercise_id: "curl", block: "main", sets: 3, rep_min: 8, rep_max: 12, target_rir: 1, rest_seconds: null }] },
     });
     const ex = s.doc.exercises[0];
-    const adv = pendingAdvice(ex, undefined, "reps", blockAdjustments([{ ...A[4], id: ex.id }], "last_set_rir0").get(ex.id))!;
+    const adv = pendingAdvice(ex, undefined, "reps", applyRules([{ ...A[4], id: ex.id }], [RIR0]).get(ex.id))!;
     s = decideAdvice(s, ex.id, adv, "accepted");
     const set = (rir: number, id: string, st: typeof s) => ({ ...st, doc: { ...st.doc, exercises: [{ ...st.doc.exercises[0], sets: [...st.doc.exercises[0].sets, { id, weightKg: 30, reps: 10, durationS: null, rir, isWarmup: false, loggedAt: "" }] }] } });
     s = set(1, "a", s);

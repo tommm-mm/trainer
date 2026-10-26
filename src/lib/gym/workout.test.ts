@@ -24,6 +24,7 @@ import {
   type TemplateInput,
   acceptAllAdvice,
   decideAdvice,
+  editTarget,
 } from "./workout";
 import type { Advice } from "./progression";
 
@@ -350,5 +351,43 @@ describe("progression advice", () => {
         rationale: "add weight · 8·8·8·8 @ RIR 1: top of the range on every set",
       },
     ]);
+  });
+});
+
+describe("editTarget (your hand edits)", () => {
+  it("changes sets / reps / RIR within sane bounds and keeps min ≤ max", () => {
+    let s = started();
+    const id = s.doc.exercises[0].id; // squat 4 × 6–8 @ RIR 1
+    s = editTarget(s, id, { sets: 5 });
+    expect(s.doc.exercises[0].target).toMatchObject({ sets: 5, repMin: 6, repMax: 8, rir: 1 });
+    s = editTarget(s, id, { repMin: 10 }); // above max: max follows
+    expect(s.doc.exercises[0].target).toMatchObject({ repMin: 10, repMax: 10 });
+    s = editTarget(s, id, { sets: 0, rir: 9 });
+    expect(s.doc.exercises[0].target).toMatchObject({ sets: 1, rir: 5 });
+    expect(s.doc.exercises[0].targetEdited).toBe(true);
+  });
+
+  it("saves the edit as this week's manual target, next to what was suggested", () => {
+    let s = started();
+    const id = s.doc.exercises[0].id;
+    const advice: Advice = {
+      sets: 4, repMin: 6, repMax: 8, rir: 1, weight: "same", aimReps: 8, reason: "in the range", basedOn: "2026-09-22",
+      basisKg: 100, repsOnly: false, lastSetRir: null, blockNote: null,
+    } as Advice;
+    s = decideAdvice(s, id, advice, "accepted");
+    s = editTarget(s, id, { sets: 5 });
+    const row = toRows(s, NOW).targets.find((t) => t.template_exercise_id === "te-1")!;
+    expect(row).toMatchObject({ sets: 5, rep_min: 6, rep_max: 8, source: "manual", week_start: "2026-09-28" });
+    expect(row.rationale).toMatch(/^set by you · suggested 4 × 6–8 @ RIR 1/);
+  });
+
+  it("accepting a suggestion after an edit takes the suggestion again", () => {
+    let s = started();
+    const id = s.doc.exercises[0].id;
+    s = editTarget(s, id, { sets: 6 });
+    const advice = { sets: 4, repMin: 6, repMax: 8, rir: 1, weight: "same", aimReps: 8, reason: "", basedOn: null } as unknown as Advice;
+    s = decideAdvice(s, id, advice, "accepted");
+    expect(s.doc.exercises[0].targetEdited).toBe(false);
+    expect(toRows(s, NOW).targets[0]).toMatchObject({ sets: 4, source: "engine" });
   });
 });

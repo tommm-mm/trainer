@@ -69,9 +69,8 @@ describe("applyRules", () => {
     expect(adj.get("curl")?.note).toBe("half the sets, last set RIR 0, add weight");
   });
 
-  it("the default rules reproduce the agreed C2c behaviour", () => {
-    expect(blockAdjustments(B, "plus_set").get("press")).toMatchObject({ sets: 5 });
-    expect(blockAdjustments(B, "plus_set").get("row")).toMatchObject({ sets: 5 });
+  it("the default rules only deload", () => {
+    expect(blockAdjustments(B, "base").size).toBe(0);
     expect(blockAdjustments(B, "deload").get("press")).toMatchObject({ sets: 2, rir: 3, weight: "keep" });
     expect(blockAdjustments(B, "deload").get("box")).toMatchObject({ sets: 2, rir: 3 });
   });
