@@ -24,7 +24,7 @@ import {
   acceptAllAdvice,
 } from "@/lib/gym/workout";
 import { pendingAdvice } from "@/lib/gym/progression";
-import { STEP_LABELS, weekRules, type BlockContext } from "@/lib/gym/periodization";
+import { STEP_LABELS, weekRules, type BlockContext, type CycleStep } from "@/lib/gym/periodization";
 import { applyRules, describeRules } from "@/lib/gym/rules";
 import { mondayOf } from "@/lib/dates";
 import { ExerciseCard } from "./exercise-card";
@@ -161,10 +161,8 @@ export function GymApp({
 // ---------------------------------------------------------------- home
 
 /** This week's block step, one line under the Gym title. */
-const STEP_NOTE: Record<string, string | null> = {
+const STEP_NOTE: Record<CycleStep, string | null> = {
   base: null,
-  plus_set: "+1 set",
-  last_set_rir0: "last set RIR 0",
   deload: "deload",
 };
 

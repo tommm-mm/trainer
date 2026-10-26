@@ -14,6 +14,7 @@ import {
   suggestNextSet,
   updateSet,
   decideAdvice,
+  editTarget,
   type ExerciseInfo,
   type LastTime,
   type LocalExercise,
@@ -98,6 +99,7 @@ function OpenBody({
 }: Props & { measure: "reps" | "time" }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
+  const [editTarget_, setEditTarget] = useState(false);
   const suggested = suggestNextSet(ex, last, measure);
   const advice = pendingAdvice(ex, last, measure, adjust);
   const editingSet = ex.sets.find((s) => s.id === editing) ?? null;
@@ -120,7 +122,18 @@ function OpenBody({
     <div className="flex flex-col gap-3 border-t border-neutral-800 px-4 pb-4 pt-3">
       <div className="flex items-start justify-between gap-2 text-xs">
         <div className="flex flex-col gap-0.5 text-neutral-400">
-          {targetText && <p>Target: {targetText}</p>}
+          <p className="flex items-center gap-2">
+            <span>
+              Target: {targetText ?? "none"}
+              {ex.targetEdited && <span className="text-emerald-400"> · yours</span>}
+            </span>
+            <button
+              onClick={() => setEditTarget(!editTarget_)}
+              className="rounded-full border border-neutral-700 px-2.5 py-0.5 text-[11px] text-neutral-200"
+            >
+              {editTarget_ ? "Done" : "Edit"}
+            </button>
+          </p>
           {last ? (
             <p>
               Last ({formatShortDate(last.date)}):{" "}
@@ -140,6 +153,14 @@ function OpenBody({
           ⋯
         </button>
       </div>
+
+      {editTarget_ && (
+        <TargetEditor
+          target={ex.target}
+          measure={measure}
+          onChange={(edit) => update((s) => editTarget(s, ex.id, edit))}
+        />
+      )}
 
       {advice && (
         <AdviceBox
@@ -428,6 +449,48 @@ function Stepper({
       >
         {plusLabel}
       </button>
+    </div>
+  );
+}
+
+/** Change today's sets / reps / RIR by hand: nothing is strict, it's your call. */
+function TargetEditor({
+  target,
+  measure,
+  onChange,
+}: {
+  target: LocalExercise["target"];
+  measure: string;
+  onChange: (edit: Parameters<typeof editTarget>[2]) => void;
+}) {
+  const t = target ?? { sets: 3, repMin: null, repMax: null, rir: null, restSeconds: null };
+  const rows: { label: string; value: number | null; step: (d: number) => void }[] = [
+    { label: "Sets", value: t.sets, step: (d) => onChange({ sets: t.sets + d }) },
+    ...(measure === "reps"
+      ? [
+          { label: "Reps from", value: t.repMin, step: (d: number) => onChange({ repMin: (t.repMin ?? 8) + d }) },
+          { label: "Reps to", value: t.repMax, step: (d: number) => onChange({ repMax: (t.repMax ?? t.repMin ?? 12) + d }) },
+        ]
+      : []),
+    { label: "RIR", value: t.rir, step: (d) => onChange({ rir: (t.rir ?? 2) + d }) },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-2 rounded-lg bg-neutral-800/60 p-3">
+      {rows.map((r) => (
+        <div key={r.label} className="flex items-center justify-between gap-1">
+          <span className="text-xs text-neutral-400">{r.label}</span>
+          <span className="flex items-center gap-1">
+            <button aria-label={`${r.label} minus`} onClick={() => r.step(-1)} className="h-9 w-9 rounded-full bg-neutral-700 text-lg">
+              −
+            </button>
+            <span className="w-7 text-center text-base font-semibold tabular-nums">{r.value ?? "–"}</span>
+            <button aria-label={`${r.label} plus`} onClick={() => r.step(1)} className="h-9 w-9 rounded-full bg-neutral-700 text-lg">
+              +
+            </button>
+          </span>
+        </div>
+      ))}
+      <p className="col-span-2 text-[11px] text-neutral-400">Saved as this week&apos;s target, next to what was suggested, for your PT.</p>
     </div>
   );
 }
