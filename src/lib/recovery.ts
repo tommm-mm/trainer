@@ -126,13 +126,3 @@ export function recoveryStatus(days: WellnessDay[], today: string): RecoveryStat
   const last = [...days].sort((a, b) => b.date.localeCompare(a.date)).find((d) => d.date <= today) ?? null;
   return { last, hrv, rhr, sleep: nights, signals };
 }
-
-/** The Today ring: green with no warning, amber with one, red with two or more. */
-export type Readiness = "ready" | "easy" | "rest" | "unknown";
-
-/** Unknown when Garmin has nothing from last night or the night before (stale data shouldn't look green). */
-export function readiness(s: RecoveryStatus | null, today: string): Readiness {
-  if (!s?.last || s.last.date < addDays(today, -1)) return "unknown";
-  if (s.signals.length === 0) return "ready";
-  return s.signals.length === 1 ? "easy" : "rest";
-}

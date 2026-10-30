@@ -14,7 +14,7 @@ import { checkWeek, legSets, type Check } from "@/lib/week-checks";
 import { loadInbox } from "@/lib/coach/queries";
 import { type PlanTemplate } from "./plan-row";
 import { syncRow } from "@/lib/health";
-import { BASELINE_DAYS, RECENT_DAYS, recoveryStatus } from "@/lib/recovery";
+import { BASELINE_DAYS, RECENT_DAYS, recoveryStatus, type WellnessDay } from "@/lib/recovery";
 
 
 export async function loadWeek(week: string | string[] | undefined) {
@@ -154,9 +154,11 @@ export async function loadWeek(week: string | string[] | undefined) {
   // Gentle nudge when there's no check-in in the last 4 days (today included).
   const lastCheckin = lastCheckinRes.data?.date ?? null;
   const daysSinceCheckin = lastCheckin ? daysBetween(lastCheckin, today) : null;
-  const recovery = isCurrentWeek && !wellnessRes.error
-    ? recoveryStatus((wellnessRes.data ?? []).map((w) => ({ ...w, hrv: w.hrv === null ? null : Number(w.hrv), vo2max: w.vo2max === null ? null : Number(w.vo2max), ctl: w.ctl === null ? null : Number(w.ctl), atl: w.atl === null ? null : Number(w.atl) })), today)
-    : null;
+  // Garmin wellness, numbers as numbers (numeric columns arrive as strings).
+  const wellness: WellnessDay[] = wellnessRes.error
+    ? []
+    : (wellnessRes.data ?? []).map((w) => ({ ...w, hrv: w.hrv === null ? null : Number(w.hrv), vo2max: w.vo2max === null ? null : Number(w.vo2max), ctl: w.ctl === null ? null : Number(w.ctl), atl: w.atl === null ? null : Number(w.atl) }));
+  const recovery = isCurrentWeek && !wellnessRes.error ? recoveryStatus(wellness, today) : null;
   // The quick check-in shows on the current week until today has one.
   const showQuickCheckin = isCurrentWeek && !lastCheckinRes.error && daysSinceCheckin !== 0;
 
@@ -201,7 +203,7 @@ export async function loadWeek(week: string | string[] | undefined) {
     today, monday, sunday, isCurrentWeek, goal, plans, activities, workouts, templates, templateName,
     seasonWeek, weekLoad, inbox, checks, flags, pendingFeedback, nextFeedback, loadError, proposedCount,
     daysSinceCheckin, recovery, showQuickCheckin, plannedKm, doneKm, gymDates, gymTarget, action,
-    weekMuscles, syncWarning, lastSyncError: syncRes.data?.last_sync_error ?? null,
+    weekMuscles, syncWarning, lastSyncError: syncRes.data?.last_sync_error ?? null, wellness,
   };
 }
 
