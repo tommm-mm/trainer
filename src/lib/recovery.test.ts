@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "@/lib/dates";
-import { parseWellness, readiness, recoveryStatus, type WellnessDay } from "./recovery";
+import { parseWellness, recoveryStatus, type WellnessDay } from "./recovery";
 
 const TODAY = "2026-10-08";
 const day = (i: number, v: Partial<WellnessDay>): WellnessDay => ({
@@ -57,18 +57,5 @@ describe("recoveryStatus", () => {
     const s = recoveryStatus([day(0, { hrv: 30, resting_hr: 70, sleep_s: 3 * 3600 })], TODAY);
     expect(s.signals).toEqual([]);
     expect(s.hrv).toBeNull();
-  });
-});
-
-describe("readiness", () => {
-  it("green in your normal range, amber on one warning, red on two", () => {
-    expect(readiness(recoveryStatus(history({ hrv: 62, resting_hr: 47 }), TODAY), TODAY)).toBe("ready");
-    expect(readiness(recoveryStatus(history({ hrv: 50, resting_hr: 47 }), TODAY), TODAY)).toBe("easy");
-    expect(readiness(recoveryStatus(history({ hrv: 50, resting_hr: 55 }), TODAY), TODAY)).toBe("rest");
-  });
-  it("unknown without data or when the last night is older than yesterday", () => {
-    expect(readiness(null, TODAY)).toBe("unknown");
-    const old = history({ hrv: 62, resting_hr: 47 }).filter((d) => d.date < addDays(TODAY, -1));
-    expect(readiness(recoveryStatus(old, TODAY), TODAY)).toBe("unknown");
   });
 });

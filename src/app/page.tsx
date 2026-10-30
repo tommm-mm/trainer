@@ -1,20 +1,33 @@
 import Link from "next/link";
 import { PageShell } from "@/components/bottom-nav";
 import { btnSmall } from "@/components/ui";
-import { formatDay, weekDays } from "@/lib/dates";
+import { addDays, formatDay, weekDays } from "@/lib/dates";
 import { formatNumber } from "@/lib/format";
-import { readiness } from "@/lib/recovery";
+import { readinessScore } from "@/lib/readiness";
+import { createClient } from "@/lib/supabase/server";
 import { resolveFlag } from "./week/actions";
 import { SyncButton } from "./week/sync-button";
 import { FeedbackCard } from "./week/feedback-card";
 import { QuickCheckin } from "./week/quick-checkin";
 import { dayState, loadWeek, type WeekData } from "./week/load";
-import { ReadinessCard } from "./today/readiness-card";
+import { ReadinessCard, type TrendPoint } from "./today/readiness-card";
+import { LastSessionCard, WeekRingsCard, type Ring } from "./today/more-cards";
 import { SessionCard } from "./today/session-card";
 
 // Today: am I ready, what do I do, what needs me. The week lives on Plan.
 export default async function TodayPage() {
-  const w = await loadWeek(undefined);
+  const supabase = await createClient();
+  const [w, lastRes] = await Promise.all([
+    loadWeek(undefined),
+    // The last 3 sessions (any day), for the "Last session" card.
+    supabase
+      .from("activities")
+      .select("id, date, type, name, distance_km, avg_pace, avg_hr, duration_min, rpe, feeling_score, run_detail")
+      .neq("type", "other")
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(3),
+  ]);
   const { today, plans, activities, templateName, seasonWeek, inbox, flags, pendingFeedback, nextFeedback } = w;
 
   const todayPlans = plans.filter((p) => p.day === today && p.status !== "proposed");
@@ -63,7 +76,7 @@ export default async function TodayPage() {
         <p className="mb-4 rounded-lg bg-red-500/10 p-3 text-sm text-red-300">Couldn&apos;t load data: {w.loadError.message}</p>
       )}
 
-      <ReadinessCard level={readiness(w.recovery, today)} status={w.recovery} today={today} />
+      <ReadinessCard r={readinessScore(w.wellness, today)} trend={trend(w)} signals={w.recovery?.signals ?? []} />
 
       {w.action && (
         <SessionCard
@@ -79,6 +92,12 @@ export default async function TodayPage() {
           Also today: {todayPlans.filter((p) => p.id !== plan?.id).map((p) => p.session_type.replace(/_/g, " ")).join(", ")}
         </p>
       )}
+
+      <LastSessionCard sessions={lastRes.data ?? []} />
+
+      <WeekRingsCard title={`This week · ${formatDay(w.monday)} – ${formatDay(addDays(w.monday, 6))}`} rings={rings(w)}>
+        <WeekStrip w={w} />
+      </WeekRingsCard>
 
       {needs > 0 && (
         <section className="mb-4 flex flex-col gap-2.5">
@@ -138,12 +157,11 @@ export default async function TodayPage() {
         </section>
       )}
 
-      <WeekStrip w={w} />
     </PageShell>
   );
 }
 
-/** One dot per day: done, planned, missed, rest. Tap → Plan. */
+/** One dot per day: done, planned, missed, rest (inside the week card). */
 function WeekStrip({ w }: { w: WeekData }) {
   const days = weekDays(w.monday).map((day) => ({ day, state: day === w.today && dayState(w, day) !== "done" ? "today" : dayState(w, day) }));
   const dot: Record<string, string> = {
@@ -156,17 +174,7 @@ function WeekStrip({ w }: { w: WeekData }) {
     rest: "h-1.5 w-1.5 bg-neutral-700",
   };
   return (
-    <Link href="/plan" className="flex flex-col gap-3 rounded-2xl bg-neutral-900 p-4">
-      <p className="flex justify-between text-sm">
-        <span className="text-neutral-400">This week</span>
-        <span className="tabular-nums">
-          <b>{formatNumber(w.doneKm)}</b>
-          <span className="text-neutral-400">
-            {" "}
-            / {formatNumber(w.seasonWeek?.week.run_km ?? w.plannedKm)} km · gym {w.gymDates.length}/{w.gymTarget}
-          </span>
-        </span>
-      </p>
+    <>
       <div className="grid grid-cols-7 text-center text-[11px] text-neutral-400">
         {days.map((d, i) => (
           <div key={d.day} className="flex flex-col items-center gap-1.5">
@@ -177,6 +185,35 @@ function WeekStrip({ w }: { w: WeekData }) {
           </div>
         ))}
       </div>
-    </Link>
+    </>
   );
+}
+
+/** Last 30 days of wellness for the readiness trends (oldest first, one point per day). */
+function trend(w: WeekData): TrendPoint[] {
+  const by = new Map(w.wellness.map((d) => [d.date, d]));
+  return Array.from({ length: 30 }, (_, i) => {
+    const date = addDays(w.today, i - 29);
+    const d = by.get(date);
+    return {
+      date,
+      hrv: d?.hrv ?? null,
+      rhr: d?.resting_hr ?? null,
+      sleepH: d?.sleep_s != null ? d.sleep_s / 3600 : null,
+      form: d?.ctl != null && d?.atl != null ? d.ctl - d.atl : null,
+    };
+  });
+}
+
+/** Run km, gym sessions and sessions done vs this week's targets. */
+function rings(w: WeekData): Ring[] {
+  const planned = w.plans.filter((p) => p.status !== "proposed");
+  const kmTarget = Number(w.seasonWeek?.week.run_km ?? w.plannedKm);
+  const done = weekDays(w.monday).filter((d) => dayState(w, d) === "done").length;
+  const days = new Set(planned.map((p) => p.day)).size;
+  return [
+    { label: "Run km", done: w.doneKm, target: kmTarget, text: `${Math.round(w.doneKm)} / ${Math.round(kmTarget)}`, color: "#34d399" },
+    { label: "Gym", done: w.gymDates.length, target: w.gymTarget, text: `${w.gymDates.length} / ${w.gymTarget}`, color: "#60a5fa" },
+    { label: "Training days", done, target: days, text: `${done} / ${days}`, color: "#a78bfa" },
+  ];
 }
