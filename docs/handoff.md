@@ -1,6 +1,6 @@
 # Handoff: where the build stands (16 Oct 2026)
 
-For a new Claude Code session. Read `README.md` (build status + formulas) and
+For a new Claude Code session. Read `docs/architecture.md` (build status + formulas) and
 `docs/coach/cowork-instructions.md` (the PT's rules) first.
 
 ## Working agreements with Tommaso
