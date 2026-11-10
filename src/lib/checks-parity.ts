@@ -6,7 +6,7 @@
 import { addDays, mondayOf } from "@/lib/dates";
 import { DEFAULT_CALIBRATION, type LoadCalibration } from "@/lib/load";
 import { validateSeasonDraft, type SeasonDraft } from "@/lib/season/model";
-import { checkWeek, type PlanInput } from "@/lib/week-checks";
+import { checkWeek, type PlanInput, type TravelRange } from "@/lib/week-checks";
 
 export type SeasonCase = {
   name: string;
@@ -24,6 +24,7 @@ export type WeekCase = {
   templates: { id: string; name: string; leg_sets: number }[];
   target: { run_km: number; long_run_km: number; runs: number; quality_sessions: number; gym_sessions: number } | null;
   plans: PlanInput[];
+  travel?: (TravelRange & { status: "approved" | "proposed" })[];
   expect?: string[];
 };
 
@@ -55,6 +56,7 @@ export function weekResult(c: WeekCase): string[] {
     plans: c.plans,
     templates: c.templates.map((t) => ({ id: t.id, name: t.name, legSets: t.leg_sets })),
     target: c.target ? { week_start: c.monday, ...c.target } : null,
+    travel: (c.travel ?? []).filter((t) => t.status === "approved"),
   });
   return checks.map((x) => `${x.severity} ${x.code} ${x.days.join(",")}`.trim());
 }

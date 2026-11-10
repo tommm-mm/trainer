@@ -462,6 +462,88 @@
         "amber km"
       ],
       "as_draft": true
+    },
+    {
+      "name": "travel: transit, no gym, strictest kind wins, off, proposed trips ignored",
+      "monday": "2026-11-30",
+      "templates": [],
+      "target": null,
+      "travel": [
+        {
+          "start_date": "2026-12-02",
+          "end_date": "2026-12-02",
+          "kind": "transit",
+          "note": "flight",
+          "status": "approved"
+        },
+        {
+          "start_date": "2026-12-03",
+          "end_date": "2026-12-06",
+          "kind": "no_gym",
+          "note": null,
+          "status": "approved"
+        },
+        {
+          "start_date": "2026-12-05",
+          "end_date": "2026-12-05",
+          "kind": "limited",
+          "note": null,
+          "status": "approved"
+        },
+        {
+          "start_date": "2026-12-06",
+          "end_date": "2026-12-06",
+          "kind": "off",
+          "note": null,
+          "status": "approved"
+        },
+        {
+          "start_date": "2026-12-04",
+          "end_date": "2026-12-04",
+          "kind": "off",
+          "note": null,
+          "status": "proposed"
+        }
+      ],
+      "plans": [
+        {
+          "day": "2026-12-02",
+          "session_type": "gym_full",
+          "target_distance_km": null,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-03",
+          "session_type": "gym_full",
+          "target_distance_km": null,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-04",
+          "session_type": "easy_run",
+          "target_distance_km": 8,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-05",
+          "session_type": "long_run",
+          "target_distance_km": 16,
+          "template_id": null
+        },
+        {
+          "day": "2026-12-06",
+          "session_type": "intervals",
+          "target_distance_km": 8,
+          "template_id": null
+        }
+      ],
+      "expect": [
+        "red hard_back_to_back 2026-12-05,2026-12-06",
+        "amber gym_back_to_back 2026-12-02,2026-12-03",
+        "amber travel_transit 2026-12-02",
+        "amber travel_no_gym 2026-12-03",
+        "amber travel_off 2026-12-06"
+      ]
     }
   ]
 }
