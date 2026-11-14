@@ -4,6 +4,7 @@ import { btnSmall } from "@/components/ui";
 import { addDays, formatDay, weekDays } from "@/lib/dates";
 import { formatNumber } from "@/lib/format";
 import { readinessScore } from "@/lib/readiness";
+import { TRAVEL_LABEL } from "@/lib/week-checks";
 import { createClient } from "@/lib/supabase/server";
 import { resolveFlag } from "./week/actions";
 import { SyncButton } from "./week/sync-button";
@@ -34,7 +35,9 @@ export default async function TodayPage() {
   const plan = w.action?.kind === "plan" ? (plans.find((p) => p.id === (w.action as { planId: string }).planId) ?? null) : null;
   const doneToday = activities.filter((a) => a.date === today && a.type !== "other");
   const proposals = (inbox?.items.length ?? 0) + (inbox?.questions.length ?? 0) + w.proposedCount;
-  const needs = (proposals > 0 ? 1 : 0) + flags.length + (nextFeedback ? 1 : 0) + (w.showQuickCheckin ? 1 : 0);
+  const tripsProposed = w.trips.filter((t) => t.status === "proposed").length;
+  const travelToday = w.travel.get(today);
+  const needs = (proposals > 0 ? 1 : 0) + (tripsProposed > 0 ? 1 : 0) + flags.length + (nextFeedback ? 1 : 0) + (w.showQuickCheckin ? 1 : 0);
   const blockLine = seasonWeek
     ? `${seasonWeek.block.name} · week ${seasonWeek.weekInBlock}/${seasonWeek.block.weeks.length}${seasonWeek.week.is_deload ? " · lighter" : ""}`
     : null;
@@ -87,6 +90,11 @@ export default async function TodayPage() {
           blockLine={blockLine}
         />
       )}
+      {travelToday && (
+        <p className="-mt-2 mb-4 rounded-xl bg-sky-500/10 px-3 py-2 text-sm text-sky-200">
+          ✈ Travel · {TRAVEL_LABEL[travelToday.kind].toLowerCase()} today{travelToday.note ? ` · ${travelToday.note}` : ""}
+        </p>
+      )}
       {todayPlans.length > 1 && (
         <p className="-mt-2 mb-4 px-1 text-xs text-neutral-400">
           Also today: {todayPlans.filter((p) => p.id !== plan?.id).map((p) => p.session_type.replace(/_/g, " ")).join(", ")}
@@ -112,6 +120,18 @@ export default async function TodayPage() {
                 <p className="text-[15px] font-semibold">PT proposals</p>
                 <p className="text-sm text-neutral-400">
                   {proposals} change{proposals === 1 ? "" : "s"} to approve
+                </p>
+              </div>
+              <span className="text-sm font-semibold text-emerald-400">Review ›</span>
+            </Link>
+          )}
+
+          {tripsProposed > 0 && (
+            <Link href="/plan#travel" className="flex items-center gap-3 rounded-2xl bg-neutral-900 p-4">
+              <div className="flex-1">
+                <p className="text-[15px] font-semibold">✈ Trip proposed by your PT</p>
+                <p className="text-sm text-neutral-400">
+                  {tripsProposed} to approve
                 </p>
               </div>
               <span className="text-sm font-semibold text-emerald-400">Review ›</span>

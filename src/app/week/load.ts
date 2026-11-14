@@ -10,7 +10,7 @@ import { forFocus } from "@/lib/gym/templates";
 import { muscleSets } from "@/lib/strength";
 import { loadSeasonWeek } from "@/lib/season/queries";
 import { loadAthlete, loadWeeks } from "@/lib/athlete";
-import { checkWeek, legSets, type Check } from "@/lib/week-checks";
+import { checkWeek, legSets, travelByDay, type Check, type TravelKind } from "@/lib/week-checks";
 import { loadInbox } from "@/lib/coach/queries";
 import { type PlanTemplate } from "./plan-row";
 import { syncRow } from "@/lib/health";
@@ -86,7 +86,7 @@ export async function loadWeek(week: string | string[] | undefined) {
 
   // This week's targets from the approved season (Season tab), load and time in zones,
   // and the plans of the 2 days either side (spacing checks across the week boundary).
-  const [seasonWeek, weekLoad, edgeRes, inbox, wellnessRes, syncRes] = await Promise.all([
+  const [seasonWeek, weekLoad, edgeRes, inbox, wellnessRes, syncRes, travelRes] = await Promise.all([
     goal ? loadSeasonWeek(supabase, goal.id, monday).catch(() => null) : null,
     loadAthlete(supabase, today)
       .then(async (athlete) => ({ athlete, ...(await loadWeeks(supabase, athlete, [monday], today)) }))
@@ -107,6 +107,13 @@ export async function loadWeek(week: string | string[] | undefined) {
       .lte("date", today),
     // Health line: warn here when Garmin hasn't synced for a day (details in Settings).
     supabase.from("athlete_settings").select("last_sync_at, last_sync_error").maybeSingle(),
+    // Trips (travel mode) from this week on: approved ones count in the week checks.
+    supabase
+      .from("travel_days")
+      .select("id, start_date, end_date, kind, note, status, source")
+      .gte("end_date", monday < today ? monday : today)
+      .order("start_date")
+      .limit(30),
   ]);
   const syncHealth = syncRes.data
     ? syncRow({ lastSyncAt: syncRes.data.last_sync_at, lastSyncError: syncRes.data.last_sync_error }, new Date())
@@ -132,6 +139,9 @@ export async function loadWeek(week: string | string[] | undefined) {
   const blockTemplates = templates.filter((t) => blockIds.has(t.id));
   const plannedIds = new Set([...plans, ...(edgeRes.data ?? [])].map((p) => p.template_id));
   const gymTarget = seasonWeek?.week.gym_sessions ?? Math.max(blockTemplates.length, 1);
+  const trips: Trip[] = (travelRes.data ?? []).map((t) => ({ ...t, kind: t.kind as TravelKind }));
+  const approvedTrips = trips.filter((t) => t.status === "approved");
+  const travel = travelByDay(approvedTrips, addDays(monday, -2), addDays(sunday, 2));
   const checks: Check[] = plans.length
     ? checkWeek({
         monday,
@@ -144,6 +154,7 @@ export async function loadWeek(week: string | string[] | undefined) {
           ),
         })),
         target: seasonWeek?.week ?? null,
+        travel: approvedTrips,
       })
     : [];
   const flags = flagsRes.data ?? [];
@@ -203,11 +214,13 @@ export async function loadWeek(week: string | string[] | undefined) {
     today, monday, sunday, isCurrentWeek, goal, plans, activities, workouts, templates, templateName,
     seasonWeek, weekLoad, inbox, checks, flags, pendingFeedback, nextFeedback, loadError, proposedCount,
     daysSinceCheckin, recovery, showQuickCheckin, plannedKm, doneKm, gymDates, gymTarget, action,
-    weekMuscles, syncWarning, lastSyncError: syncRes.data?.last_sync_error ?? null, wellness,
+    weekMuscles, syncWarning, lastSyncError: syncRes.data?.last_sync_error ?? null, wellness, trips, travel,
   };
 }
 
 export type WeekData = Awaited<ReturnType<typeof loadWeek>>;
+
+export type Trip = { id: string; start_date: string; end_date: string; kind: TravelKind; note: string | null; status: string; source: string };
 
 export type DayState = "done" | "missed" | "changed" | "proposed" | "planned" | "rest";
 

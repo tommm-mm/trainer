@@ -10,7 +10,7 @@ import { TargetMeters } from "@/components/season-targets";
 import { weeklyActuals } from "@/lib/season/progress";
 import { plannedLoad } from "@/lib/load";
 import { LoadMeters } from "@/components/load-meters";
-import { type Check } from "@/lib/week-checks";
+import { TRAVEL_LABEL, type Check } from "@/lib/week-checks";
 import { CoachInbox } from "@/components/coach-inbox";
 import { approveWeek } from "../week/actions";
 import { PlanRow, type PlanTemplate } from "../week/plan-row";
@@ -18,6 +18,7 @@ import { AddSession } from "../week/add-session";
 import { RunDetailView } from "@/components/run-detail";
 
 import { dayState, loadWeek, type DayState } from "../week/load";
+import { TravelCard } from "./travel-card";
 import { sessionKind, sessionLabel } from "@/lib/sessions";
 
 export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
@@ -115,7 +116,10 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
               <span className="text-[11px] text-neutral-400">{"MTWTFSS"[i]}</span>
               <span className="text-[15px] font-semibold tabular-nums">{Number(d.slice(8))}</span>
               <span className={`rounded-full ${DOT[state]}`} />
-              <span className="w-full truncate px-0.5 text-center text-[10px] text-neutral-300">{label}</span>
+              <span className="w-full truncate px-0.5 text-center text-[10px] text-neutral-300">
+                {w.travel.has(d) && <span aria-label={TRAVEL_LABEL[w.travel.get(d)!.kind]}>✈ </span>}
+                {label}
+              </span>
             </Link>
           );
         })}
@@ -129,6 +133,12 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
         ))}
       </p>
 
+      {w.travel.has(day) && (
+        <p className="mb-2 rounded-xl bg-sky-500/10 px-3 py-2 text-sm text-sky-200">
+          ✈ {TRAVEL_LABEL[w.travel.get(day)!.kind]}
+          {w.travel.get(day)!.note ? ` · ${w.travel.get(day)!.note}` : ""}
+        </p>
+      )}
       <ol className="mb-4">
         <DayCard
           day={day}
@@ -185,6 +195,8 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
       </section>
 
       {plans.length > 0 && <WeekChecks checks={checks} proposed={proposedCount > 0} />}
+
+      <TravelCard trips={w.trips} today={today} />
 
       <div id="proposals" className="scroll-mt-4" />
       {inbox && <CoachInbox items={inbox.items} questions={inbox.questions} />}

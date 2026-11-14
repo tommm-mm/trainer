@@ -8,6 +8,8 @@
 //   amber gym sessions on consecutive days (≥ 48 h between full-body sessions)
 //   amber week totals vs the season week: gym sessions, runs, quality
 //         sessions, a long run, km (±10%)
+//   amber travel days (travel_days): off / transit → any session, no_gym →
+//         gym, limited → a long run or a quality session (strictest kind wins)
 
 import { addDays, daysBetween, formatDay } from "@/lib/dates";
 import { sessionKind, sessionLabel } from "@/lib/sessions";
@@ -22,6 +24,29 @@ export type PlanInput = {
 
 export type TemplateLegs = { id: string; name: string; legSets: number };
 
+export type TravelKind = "off" | "transit" | "no_gym" | "limited";
+export type TravelRange = { start_date: string; end_date: string; kind: TravelKind; note: string | null };
+
+export const TRAVEL_LABEL: Record<TravelKind, string> = {
+  off: "Day off",
+  transit: "Travel day",
+  no_gym: "No gym",
+  limited: "Limited time",
+};
+const TRAVEL_ORDER: TravelKind[] = ["off", "transit", "no_gym", "limited"];
+
+/** One kind per day from the ranges given (approved only): the strictest wins. */
+export function travelByDay(ranges: TravelRange[], from: string, to: string): Map<string, { kind: TravelKind; note: string | null }> {
+  const out = new Map<string, { kind: TravelKind; note: string | null }>();
+  for (const r of ranges) {
+    for (let d = r.start_date < from ? from : r.start_date; d <= r.end_date && d <= to; d = addDays(d, 1)) {
+      const cur = out.get(d);
+      if (!cur || TRAVEL_ORDER.indexOf(r.kind) < TRAVEL_ORDER.indexOf(cur.kind)) out.set(d, { kind: r.kind, note: r.note });
+    }
+  }
+  return out;
+}
+
 export type Check = {
   severity: "red" | "amber";
   code:
@@ -34,7 +59,11 @@ export type Check = {
     | "runs_count"
     | "quality_count"
     | "long_run"
-    | "km";
+    | "km"
+    | "travel_off"
+    | "travel_transit"
+    | "travel_no_gym"
+    | "travel_limited";
   /** Days involved (for highlighting). */
   days: string[];
   message: string;
@@ -89,6 +118,7 @@ export function checkWeek(opts: {
   plans: PlanInput[];
   templates: TemplateLegs[];
   target?: WeekTargets | null;
+  travel?: TravelRange[];
 }): Check[] {
   const { monday, plans, templates, target } = opts;
   const sunday = addDays(monday, 6);
@@ -195,6 +225,25 @@ export function checkWeek(opts: {
     if (target.run_km && allKm && Math.abs(km - target.run_km) > target.run_km * KM_TOLERANCE) {
       add("km", `${Math.round(km * 10) / 10} km planned vs ${target.run_km} km in the season week (±${KM_TOLERANCE * 100}%).`);
     }
+  }
+
+  // ---- travel days (after the others, like check_week)
+  const travel = travelByDay(opts.travel ?? [], monday, sunday);
+  for (const d of [...travel.keys()].sort()) {
+    const t = travel.get(d)!;
+    const list = byDay.get(d) ?? [];
+    const hit =
+      t.kind === "no_gym" ? list.some((p) => sessionKind(p.session_type) === "gym")
+      : t.kind === "limited" ? list.some(isHardRun)
+      : list.length > 0;
+    if (!hit) continue;
+    const what = t.kind === "no_gym" ? "gym is" : t.kind === "limited" ? "a hard run is" : "a session is";
+    out.push({
+      severity: "amber",
+      code: `travel_${t.kind}`,
+      days: [d],
+      message: `${day(d)}: ${TRAVEL_LABEL[t.kind].toLowerCase()}${t.note ? ` (${t.note})` : ""}, but ${what} planned.`,
+    });
   }
 
   return out.sort((x, y) => (x.severity === y.severity ? 0 : x.severity === "red" ? -1 : 1));

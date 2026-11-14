@@ -692,6 +692,42 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["push_subscriptions"]["Insert"]>
         Relationships: []
       }
+      travel_days: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          kind: string
+          note: string | null
+          source: string
+          start_date: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          kind: string
+          note?: string | null
+          source?: string
+          start_date: string
+          status?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          source?: string
+          start_date?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       wellness: {
         Row: {
           atl: number | null

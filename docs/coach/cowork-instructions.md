@@ -233,7 +233,8 @@ tests). Iterate until it's clean or every remaining warning is one you'd explain
 select check_season_draft((select id from goals where status = 'active'), '<SeasonDraft JSON>'::jsonb);
 -- a week's sessions as a draft: his saved sessions that aren't proposed + yours.
 -- red = safety (gym + hard run same day, hard runs back to back, leg-heaviest gym the day before a
--- hard run); amber = rest and totals vs the season week. Without the list: checks what's saved.
+-- hard run); amber = rest, totals vs the season week and travel days (below). Without the list:
+-- checks what's saved.
 select check_week('<Monday>', '[{"day":"<YYYY-MM-DD>","session_type":"tempo","target_distance_km":10},
                                 {"day":"<YYYY-MM-DD>","session_type":"gym_full","template_id":"<id>"}]'::jsonb);
 ```
@@ -274,6 +275,31 @@ Values: muscles ∈ chest, back, shoulders, biceps, triceps, quads, hamstrings, 
 `equipment` ∈ barbell, dumbbell, machine, cable, bodyweight, kettlebell, other; `mechanic` ∈
 compound, isolation; `measure` ∈ reps (default), time; `gym_focus` = a list from hypertrophy,
 strength, power, maintenance, off (`null` = every block).
+
+### Travel days (travel mode)
+
+Days he can't train as usual live in `travel_days` (date ranges). Read them before planning a week:
+`select start_date, end_date, kind, note, status from travel_days where end_date >= current_date order by start_date;`
+
+| `kind` | Meaning | `check_week` warns (amber) on |
+|---|---|---|
+| `off` | no training at all | any session that day |
+| `transit` | travel day | any session that day |
+| `no_gym` | running only | a gym session that day |
+| `limited` | short on time / space | a long run or a quality session that day |
+
+Overlapping ranges: the strictest kind wins (off > transit > no_gym > limited). Only `approved`
+rows count. When he tells you about a trip in chat, **propose** it (he approves it on the Plan tab):
+
+```sql
+insert into travel_days (user_id, start_date, end_date, kind, note, status, source)
+values ('fae76b55-46c7-410d-b348-1f7daf7ffd00', '2026-12-02', '2026-12-08', 'no_gym', 'Trip', 'proposed', 'coach');
+```
+
+One row per stretch of the same kind (e.g. a `transit` day, then `no_gym` for the rest). Then plan
+the week around the approved days: move gym off `no_gym` days, keep long and quality runs off
+`limited` days, and run `check_week` on your draft before proposing it. Lost gym sessions: say so
+in the rationale (don't cram them into the remaining days).
 
 ### Gym tools: you design the program, the app runs it
 

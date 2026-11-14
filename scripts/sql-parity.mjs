@@ -84,6 +84,12 @@ values ('${USER}', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0
   ${c.target.run_km}, ${c.target.long_run_km}, ${c.target.runs}, ${c.target.quality_sessions}, ${c.target.gym_sessions});`
     : ""
 }
+${(c.travel ?? [])
+  .map(
+    (t) => `insert into travel_days (user_id, start_date, end_date, kind, note, status)
+values ('${USER}', '${t.start_date}', '${t.end_date}', '${t.kind}', ${q(t.note)}, '${t.status}');`,
+  )
+  .join("\n")}
 ${(c.as_draft ? [] : c.plans)
   .map(
     (p, i) => `insert into weekly_plans (user_id, week_start_date, day, session_type, target_distance_km, template_id, status, created_at)
